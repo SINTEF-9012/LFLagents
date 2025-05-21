@@ -1,0 +1,9 @@
+PyPDF2
+neo4j
+langchain-community
+langchain_experimental
+langchain_openai
+streamlit
+streamlit_chat
+streamlit_extras
+python-dotenv
