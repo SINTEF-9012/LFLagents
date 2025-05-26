@@ -6,7 +6,7 @@ Learning Feedback Loop agent-based approach
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/tieukhoimai/sintef-internship-reed.git
+git clone https://github.com/SINTEF-9012/LFLagents.git
 ```
 
 ### 2. Install the requirements`
@@ -164,6 +164,42 @@ This command starts the Streamlit application, allowing users to interact with t
 
 ## Part 2: Monitoring Agent
 
-[IN PROGRESS] The Monitoring Agent is designed to monitor the factory's status and provide real-time updates. It utilizes the SINDIT platform to collect data from various sensors and devices in the factory. The agent processes this data and retrieves relevant information from the Neo4j graph database to provide insights into the factory's operations.
+[IN PROGRESS] The Monitoring Agent is designed to monitor the factory's status and provide real-time updates. It uses the SINDIT platform to collect data from various sensors and devices in the factory, processes this data, and retrieves relevant information from SINDIT to provide insights into factory operations.
 
-![data_from_SINDIT](images/data_from_SINDIT.png)
+### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
+
+SINDIT is structured according to the reference architecture for digital twin (DT) systems developed in the COGNIMAN project. It enhances flexibility and modularity through interfaces that connect different components for building knowledge graph-based DTs. See the [SINDIT documentation](https://github.com/SINTEF-9012/SINDIT20) to set up the framework.
+
+![sindit model](images/sindit_model.png)
+<p align="center">
+  <em>SINDIT Knowledge Graph Information Model</em>
+</p>
+
+The Data Layer of the Fischertechnik Digital Twin uses MQTT Data Connectors to stream real-time data from the factory's sensors and devices. Refer the MQTT broker setup in the [fischertechnik/txt_training_factory repository](https://github.com/fischertechnik/txt_training_factory/tree/master).
+
+![mqtt data](images/mqtt_realtime_data.png)
+<p align="center">
+  <em>Snapshot of the real-time data from MQTT broker</em>
+</p>
+
+The connection details are specified in `src/config/connections.json`, where you will see fields like `username` and `passwordPath` for the MQTT connection.
+
+Before setting up the connector, we need to securely store the MQTT credentials. Use the SINDIT API endpoint `POST vault/secrets` to save the username and password. This ensures that confidential information is managed securely before establishing the MQTT connection.
+
+To automate the setup of the SINDIT knowledge graph and its connections, run the following script:
+
+```bash
+python src/sindit_kg.py
+``` 
+
+This script streamlines the process of registering MQTT connections, streaming properties, assets, and the knowledge graph itself by interacting with the SINDIT API. Running the script ensures that all necessary components are properly configured for real-time monitoring and data integration.
+   - Register the MQTT connection
+   - Register all streaming properties
+   - Register all assets (factory sensor, camera, VGR, HBW, SLD, MPO, DSO, DSI, order)
+   - Register the SINDIT knowledge graph (`sindit_kg`)
+
+![SINDIT Graph](images/sindit_graph.png)
+
+<p align="center">
+  <em>Result: Snapshot of the SINDIT graph created for the Fischertechnik factorys</em>
+</p>
