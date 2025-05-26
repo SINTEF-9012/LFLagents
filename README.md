@@ -6,7 +6,7 @@ Learning Feedback Loop agent-based approach
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/tieukhoimai/sintef-internship-reed.git
+git clone https://github.com/SINTEF-9012/LFLagents.git
 ```
 
 ### 2. Install the requirements`
@@ -164,7 +164,7 @@ This command starts the Streamlit application, allowing users to interact with t
 
 ## Part 2: Monitoring Agent
 
-[IN PROGRESS] The Monitoring Agent is designed to monitor the factory's status and provide real-time updates. It uses the SINDIT platform to collect data from various sensors and devices in the factory, processes this data, and retrieves relevant information from the Neo4j graph database to provide insights into factory operations.
+[IN PROGRESS] The Monitoring Agent is designed to monitor the factory's status and provide real-time updates. It uses the SINDIT platform to collect data from various sensors and devices in the factory, processes this data, and retrieves relevant information from SINDIT to provide insights into factory operations.
 
 ### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
 
@@ -194,7 +194,7 @@ python src/sindit_kg.py
 
 This script streamlines the process of registering MQTT connections, streaming properties, assets, and the knowledge graph itself by interacting with the SINDIT API. Running the script ensures that all necessary components are properly configured for real-time monitoring and data integration.
    - Register the MQTT connection
-   - Register all streaming properties (from `src/sindit2-connection/config/streaming_properties.json`)
+   - Register all streaming properties
    - Register all assets (factory sensor, camera, VGR, HBW, SLD, MPO, DSO, DSI, order)
    - Register the SINDIT knowledge graph (`sindit_kg`)
 
