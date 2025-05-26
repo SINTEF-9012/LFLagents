@@ -1,0 +1,191 @@
+[
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#factory-sensor",
+    "label": "Factory Sensor",
+    "assetDescription": "Collection of the sensors in the factory",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#temperature"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#humidity"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#AirQualityScore"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#IndexAirQuality"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#AirPressure"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#GasResistance"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#Brightness"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#LDR"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#camera",
+    "label": "Camera",
+    "assetDescription": "Collection of the camera data including Camera Picture and Pan-Tilt-Unit",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#CameraData"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#CameraPosPan"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#CameraPosTilt"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#order",
+    "label": "Order",
+    "assetDescription": "Collection of the order data including OrderState, OrderType and OrderLatestType",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#OrderState"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#OrderType"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#OrderLatestType"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#Stock"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#sld",
+    "label": "SLD",
+    "assetDescription": "Collection of the data from the sorting line (sld)",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#sldStation"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#sldCode"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#sldActive"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#sldTarget"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#vgr",
+    "label": "VGR",
+    "assetDescription": "Collection of the data from the vacuum suction gripper (vgr)",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#vgrStation"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#vgrCode"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#vgrActive"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#vgrTarget"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#hbw",
+    "label": "HBW",
+    "assetDescription": "Collection of the data from the high-bay warehouse (hbw)",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#hbwStation"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#hbwCode"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#hbwActive"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#hbwTarget"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#mpo",
+    "label": "MPO",
+    "assetDescription": "Collection of the data from the Multi-Processing Station (mpo)",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#mpoStation"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#mpoCode"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#mpoActive"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#mpoTarget"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#dso",
+    "label": "DSO",
+    "assetDescription": "Collection of the data from DSO",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsoStation"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsoCode"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsoActive"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsoTarget"
+      }
+    ]
+  },
+  {
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#AbstractAsset",
+    "uri": "http://sindit.sintef.no/2.0#dsi",
+    "label": "DSI",
+    "assetDescription": "Collection of the data from DSI",
+    "assetProperties": [
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsiStation"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsiCode"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsiActive"
+      },
+      {
+        "uri": "http://sindit.sintef.no/2.0#dsiTarget"
+      }
+    ]
+  }
+]

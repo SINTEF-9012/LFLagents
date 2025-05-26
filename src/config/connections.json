@@ -1,0 +1,12 @@
+{
+    "class_uri": "urn:samm:sindit.sintef.no:1.0.0#Connection",
+    "uri": "http://sindit.sintef.no/2.0#mqtt-connection",
+    "label": "MQTT connection",
+    "type": "MQTT",
+    "host": "toy-factory-mqtt.default.svc.cluster.local",
+    "port": 2883,
+    "username": "txt",
+    "passwordPath": "mqtt_pass",
+    "isConnected": true,
+    "connectionDescription": "MQTT Connection"
+}

@@ -1,0 +1,398 @@
+[
+    {
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#temperature",
+        "label": "Temperature",
+        "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#degreeCelsius"},
+        "propertyDescription": "Temperature data from the sensor",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/bme680",
+        "streamingPath": "data['t']"
+    },
+    {
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#humidity",
+        "label": "Humidity",
+        "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#percent"},
+        "propertyDescription": "Humidity data from the sensor",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/bme680",
+        "streamingPath": "h"
+    },
+    {
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#AirQualityScore",
+        "label": "AirQualityScore",
+        "propertyDescription": "Air quality score 0-3 (0:IAQ invalid, 1:calibration necessary, 2:calibration done, 3:IAQ is calibrated)",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/bme680",
+        "streamingPath": "aq"
+    },
+    {
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#IndexAirQuality",
+        "label": "IndexAirQuality",
+        "propertyDescription": "Index air quality 0-500(0-50:Good, 51-100:Moderate, 101-150:Unhealthy for Sensitive Groups, 151-200:Unhealthy, 201-300:Very Unhealthy, 301-500:Hazardous)",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/bme680",
+        "streamingPath": "iaq"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#AirPressure",
+        "label": "AirPressure",
+        "propertyDescription": "AirPressure [hPa]",
+        "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#hPa"},
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/bme680",
+        "streamingPath": "p"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#GasResistance",
+        "label": "GasResistance",
+        "propertyDescription": "Gas Resistance [Ohm]",
+        "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#ohm"},
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/bme680",
+        "streamingPath": "gr"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#Brightness",
+        "label": "Brightness",
+        "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#percent"},
+        "propertyDescription": "Brightness 0-100.0 [%]",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/ldr",
+        "streamingPath": "br"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#LDR",
+        "label": "LDR",
+        "propertyDescription": "Value resistance 0-15000 [Ohm]",
+        "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#ohm"},
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/ldr",
+        "streamingPath": "ldr"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#CameraData",
+        "label": "CameraData",
+        "propertyDescription": "camera image as base64 string",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema/#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/cam",
+        "streamingPath": "data['data']"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#CameraPosPan",
+        "label": "CameraPosPan",
+        "propertyDescription": "relative position pan: -1.000,1.000",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/ptu/pos",
+        "streamingPath": "pan"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#CameraPosTilt",
+        "label": "CameraPosTilt",
+        "propertyDescription": "relative position tilt: -1.000,1.000",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#float"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "i/ptu/pos",
+        "streamingPath": "tilt"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#Stock",
+        "label": "Stock",
+        "propertyDescription": "workpiece data in JSON format",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/stock",
+        "streamingPath": "stockItems"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#OrderState",
+        "label": "OrderState",
+        "propertyDescription": "State of the order item including WAITING_FOR_ORDER, ORDERED, IN_PROCESS, SHIPPED",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/order",
+        "streamingPath": "state"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#OrderType",
+        "label": "OrderType",
+        "propertyDescription": "Type of the order item including WHITE, BLUE, RED",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/order",
+        "streamingPath": "type"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#OrderLatestType",
+        "label": "OrderLatestType",
+        "propertyDescription": "Type of the latest order item including WHITE, BLUE, RED",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/o/order",
+        "streamingPath": "type"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#vgrStation",
+        "label": "vgrStation",
+        "propertyDescription": "Station name of Vacuum suction gripper (vgr)",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/vgr",
+        "streamingPath": "station"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#vgrCode",
+        "label": "vgrCode",
+        "propertyDescription": "Status code for vgr",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#integer"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/vgr",
+        "streamingPath": "code"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#vgrActive",
+        "label": "vgrActive",
+        "propertyDescription": "Active status for vgr",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#boolean"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/vgr",
+        "streamingPath": "active"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#vgrTarget",
+        "label": "vgrTarget",
+        "propertyDescription": "The next destination for vgr. This can be empty (no target assigned) or the name of the next station vgr should move to.",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/vgr",
+        "streamingPath": "target"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#hbwStation",
+        "label": "hbwStation",
+        "propertyDescription": "Station name of High-bay warehouse (hbw)",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/hbw",
+        "streamingPath": "station"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#hbwCode",
+        "label": "hbwCode",
+        "propertyDescription": "Status code for hbw",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#integer"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/hbw",
+        "streamingPath": "code"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#hbwActive",
+        "label": "hbwActive",
+        "propertyDescription": "Active status for hbw",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#boolean"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/hbw",
+        "streamingPath": "active"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#hbwTarget",
+        "label": "hbwTarget",
+        "propertyDescription": "The next destination for hbw. This can be empty (no target assigned) or the name of the next station hbw should move to.",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/hbw",
+        "streamingPath": "target"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#sldStation",
+        "label": "sldStation",
+        "propertyDescription": "Station name of Sorting line (sld)",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/sld",
+        "streamingPath": "station"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#sldCode",
+        "label": "sldCode",
+        "propertyDescription": "Status code for sld",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#integer"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/sld",
+        "streamingPath": "code"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#sldActive",
+        "label": "sldActive",
+        "propertyDescription": "Active status for sld",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#boolean"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/sld",
+        "streamingPath": "active"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#sldTarget",
+        "label": "sldTarget",
+        "propertyDescription": "The next destination for sld. This can be empty (no target assigned) or the name of the next station sld should move to.",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/sld",
+        "streamingPath": "target"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#mpoStation",
+        "label": "mpoStation",
+        "propertyDescription": "Station name of Multi-Processing Station (mpo)",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/mpo",
+        "streamingPath": "station"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#mpoCode",
+        "label": "mpoCode",
+        "propertyDescription": "Status code for mpo",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#integer"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/mpo",
+        "streamingPath": "code"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#mpoActive",
+        "label": "mpoActive",
+        "propertyDescription": "Active status for mpo",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#boolean"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/mpo",
+        "streamingPath": "active"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#mpoTarget",
+        "label": "mpoTarget",
+        "propertyDescription": "The next destination for mpo. This can be empty (no target assigned) or the name of the next station mpo should move to.",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/mpo",
+        "streamingPath": "target"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsoStation",
+        "label": "dsoStation",
+        "propertyDescription": "Station name of DSO",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dso",
+        "streamingPath": "station"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsoCode",
+        "label": "dsoCode",
+        "propertyDescription": "Status code for dso",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#integer"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dso",
+        "streamingPath": "code"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsoActive",
+        "label": "dsoActive",
+        "propertyDescription": "Active status for dso",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#boolean"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dso",
+        "streamingPath": "active"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsoTarget",
+        "label": "dsoTarget",
+        "propertyDescription": "The next destination for dso. This can be empty (no target assigned) or the name of the next station dso should move to.",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dso",
+        "streamingPath": "target"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsiStation",
+        "label": "dsiStation",
+        "propertyDescription": "Station name of DSI",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dsi",
+        "streamingPath": "station"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsiCode",
+        "label": "dsiCode",
+        "propertyDescription": "Status code for dsi",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#integer"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dsi",
+        "streamingPath": "code"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsiActive",
+        "label": "dsiActive",
+        "propertyDescription": "Active status for dsi",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#boolean"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dsi",
+        "streamingPath": "active"
+    },
+    {
+        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "uri": "http://sindit.sintef.no/2.0#dsiTarget",
+        "label": "dsiTarget",
+        "propertyDescription": "The next destination for dsi. This can be empty (no target assigned) or the name of the next station dsi should move to.",
+        "propertyDataType": {"uri": "http://www.w3.org/2001/XMLSchema#string"},
+        "propertyConnection": {"uri": "http://sindit.sintef.no/2.0#mqtt-connection"},
+        "streamingTopic": "f/i/state/dsi",
+        "streamingPath": "target"
+    }
+]
