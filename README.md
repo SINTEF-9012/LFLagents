@@ -129,42 +129,26 @@ This script processes the PDF files in the `manual` folder, extracts graph data,
 
 ### 2. Retrieval Augmented Generation (RAG) with RetrieverAgent
 
-The `RetrieverAgent` integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
+The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
 
-   - File: `src/retriever_agent.py`
-     - `Neo4jVectorTool`
-       - Performs similarity-based retrieval from the `Neo4jVector` index.
-       - Retrieves the most relevant documents based on the user's query.
-     - `Neo4jCypherTool`
-       - Executes Cypher queries to retrieve structured knowledge from the Neo4j graph.
-       - Generates Cypher statements using OpenAI's language model
-     - `RetrieverAgent`
-       - Combines the results from both tools to provide a comprehensive answer to user queries.
-       - Uses OpenAI's chat models to generate responses by integrating results from both tools.
-       - Maintains chat history using Streamlit's session state and a conversation buffer.
-       - Prompt Engineering:
-         - The system prompt guides the assistant to provide concise, accurate, and relevant responses.
-         - The assistant covers topics such as:
-           - Factory components (e.g., high-bay warehouse, suction gripper, sorting line).
-           - IoT Gateway, Node-RED dashboards, and cloud integration.
-           - Programming tasks, system setup, and educational simulations.
-   - File: `src/app.py`
-     - Implements a Streamlit web application to interact with the `RetrieverAgent`.
-     - Provides a user-friendly interface for querying the Neo4j graph and receiving augmented responses.
-
-### 3. Running the Streamlit Application
-
-```bash
-streamlit run src/app.py
-```
-
-This command starts the Streamlit application, allowing users to interact with the `RetrieverAgent` through a web interface.
-
-![streamlit UI](images/streamlit_140525.png)
+ - `Neo4jVectorTool`
+   - Performs similarity-based retrieval from the `Neo4jVector` index.
+   - Retrieves the most relevant documents based on the user's query.
+ - `Neo4jCypherTool`
+   - Executes Cypher queries to retrieve structured knowledge from the Neo4j graph.
+   - Generates Cypher statements using OpenAI's language model
+ - `RetrieverAgent`
+   - Combines the results from both tools to provide a comprehensive answer to user queries.
+   - Uses OpenAI's chat models to generate responses by integrating results from both tools.
+   - Maintains chat history using Streamlit's session state and a conversation buffer.
+   - Prompt Engineering:
+     - The system prompt guides the assistant to provide concise, accurate, and relevant responses.
+     - The assistant covers topics such as:
+       - Factory components (e.g., high-bay warehouse, suction gripper, sorting line).
+       - IoT Gateway, Node-RED dashboards, and cloud integration.
+       - Programming tasks, system setup, and educational simulations.
 
 ## Part 2: Monitoring Agent
-
-[IN PROGRESS] The Monitoring Agent is designed to monitor the factory's status and provide real-time updates. It uses the SINDIT platform to collect data from various sensors and devices in the factory, processes this data, and retrieves relevant information from SINDIT to provide insights into factory operations.
 
 ### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
 
@@ -194,7 +178,7 @@ python src/sindit_kg.py
 
 This script streamlines the process of registering MQTT connections, streaming properties, assets, and the knowledge graph itself by interacting with the SINDIT API. Running the script ensures that all necessary components are properly configured for real-time monitoring and data integration.
    - Register the MQTT connection
-   - Register all streaming properties
+   - Register all streaming properties (from `src/sindit2-connection/config/streaming_properties.json`)
    - Register all assets (factory sensor, camera, VGR, HBW, SLD, MPO, DSO, DSI, order)
    - Register the SINDIT knowledge graph (`sindit_kg`)
 
@@ -203,3 +187,32 @@ This script streamlines the process of registering MQTT connections, streaming p
 <p align="center">
   <em>Result: Snapshot of the SINDIT graph created for the Fischertechnik factorys</em>
 </p>
+
+### 2. Monitoring Agent Architecture
+
+The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-time monitoring and analysis of manufacturing data by interfacing with the SINDIT Knowledge Graph API. Below is an overview of its main components and functionalities:
+  - `SINDITDataTool`: A custom tool that classifies user queries, determines relevant manufacturing assets (e.g., VGR, HBW, sensors), and retrieves real-time data from the SINDIT API. It maps natural language queries to specific asset URIs and fetches associated data, including sensor readings and connection status.
+  - `classify_query`: analyzes the user's natural language query to identify relevant manufacturing assets (such as VGR, HBW, sensors, etc.). It maps keywords in the query to specific asset URIs used by the SINDIT Knowledge Graph API, ensuring that data retrieval targets the most relevant components for the user's request.
+  - `get_real_time_data`: Retrieves real-time manufacturing data from the SINDIT Knowledge Graph API based on a user query and optional asset/property filters.
+  - `query`: The main entry point for user queries. It retrieves real-time data, formats it with the original query, and generates a comprehensive response using the LLM conversation chain.
+  - `get_sindit_status`: Fetches the connection status of MQTT connections from the SINDIT Knowledge Graph API.
+
+## Part 3: Integrating Agents
+
+ The Integrated Agent (`src/agents/integrated_agent.py`) supports an integrated agent approach, combining the strengths of both the `RetrieverAgent` and the `MonitoringAgent` to provde a unified interface for factory information retrieval and real-time monitoring. The integrated agent coordinates between:
+   - RetrieverAgent: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
+   - MonitoringAgent: Focuses on real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
+
+## Result
+
+The demo showcases the capabilities of the `RetrieverAgent` and `MonitoringAgent` in a Streamlit application. It allows users to interact with the agents, ask questions about the factory, and monitor real-time data from the SINDIT knowledge graph.
+To run the demo, execute the following command:
+
+```bash
+streamlit run src/app.py
+```
+
+This command starts the Streamlit application, providing a user-friendly interface for interacting with the agents and visualizing the factory's status.
+
+![streamlit_demo](images/streamlit_300525.png)
+
