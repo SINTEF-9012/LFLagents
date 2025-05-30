@@ -150,6 +150,8 @@ The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database t
 
 ## Part 2: Monitoring Agent
 
+![Monitoring Agent](images/MonitoringAgent.png)
+
 ### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
 
 SINDIT is structured according to the reference architecture for digital twin (DT) systems developed in the COGNIMAN project. It enhances flexibility and modularity through interfaces that connect different components for building knowledge graph-based DTs. See the [SINDIT documentation](https://github.com/SINTEF-9012/SINDIT20) to set up the framework.
@@ -199,9 +201,11 @@ The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-ti
 
 ## Part 3: Integrating Agents
 
- The Integrated Agent (`src/agents/integrated_agent.py`) supports an integrated agent approach, combining the strengths of both the `RetrieverAgent` and the `MonitoringAgent` to provde a unified interface for factory information retrieval and real-time monitoring. The integrated agent coordinates between:
-   - RetrieverAgent: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
-   - MonitoringAgent: Focuses on real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
+![overview architeture](images/architecture.png)
+
+The Integrated Agent (`src/agents/integrated_agent.py`) supports an integrated agent approach, combining the strengths of both the `RetrieverAgent` and the `MonitoringAgent` to provde a unified interface for factory information retrieval and real-time monitoring. The integrated agent coordinates between:
+  - RetrieverAgent: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
+  - MonitoringAgent: Focuses on real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
 
 ## Result
 
