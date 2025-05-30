@@ -26,7 +26,7 @@ graph = Neo4jGraph(
     url=os.environ["NEO4J_URL"],
     username=os.environ["NEO4J_USERNAME"],
     password=os.environ["NEO4J_PASSWORD"],
-    enhanced_schema=True
+    # enhanced_schema=True
 )
 
 def clean_graph():
@@ -85,3 +85,11 @@ def load_vector_index(
     )
 
     return neo4j_vector
+
+def get_vector_index_info():
+    query = "SHOW VECTOR INDEX"
+    result = graph.query(query)
+    if result:
+        return result
+    else:
+        return "No vector index found."
