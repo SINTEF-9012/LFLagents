@@ -10,7 +10,6 @@
     { "uri": "http://sindit.sintef.no/2.0#mpo" },
     { "uri": "http://sindit.sintef.no/2.0#dso" },
     { "uri": "http://sindit.sintef.no/2.0#dsi" },
-    { "uri": "http://sindit.sintef.no/2.0#order" },
-    { "uri": "http://sindit.sintef.no/2.0#stock" }
+    { "uri": "http://sindit.sintef.no/2.0#order" }
   ]
 }

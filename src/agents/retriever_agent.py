@@ -1,25 +1,24 @@
 import os
+import json
+from datetime import datetime
 
 from utils.neo4j_connection import graph, load_vector_index
 
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_community.chains.graph_qa.cypher import GraphCypherQAChain
 
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain import LLMChain
+from langchain.chains import ConversationChain
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 
 from langchain.pydantic_v1 import BaseModel
 from langchain.tools import BaseTool
-from typing import Type
+from typing import Type, Dict, Any
 
 import streamlit as st
-from langchain.chains import ConversationChain
-from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain.prompts import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
-    ChatPromptTemplate,
-    MessagesPlaceholder,
     PromptTemplate
 )
 
@@ -111,6 +110,7 @@ class Neo4jCypherTool(BaseTool):
         return chain.run(question)
 
 class RetrieverAgent:
+
     def __init__(self):
         
         # Initialize tools        
@@ -137,7 +137,7 @@ class RetrieverAgent:
             st.session_state['messages'] = []
 
         if 'buffer_memory' not in st.session_state:
-            st.session_state['buffer_memory'] = ConversationBufferWindowMemory(k=100000, return_messages=True)
+            st.session_state['buffer_memory'] = ConversationBufferWindowMemory(k=1000000000, return_messages=True)
             
         if 'chat_history' not in st.session_state:
             st.session_state['chat_history'] = []
@@ -173,11 +173,133 @@ class RetrieverAgent:
             verbose=True
         )
     
-    def save_chat_history(self,chat_history, folder_name, file_name):
-        folder_path = os.path.join(os.getcwd(), folder_name)
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-        file_path = os.path.join(folder_path, file_name)
-        with open(file_path, "w", encoding="utf-8") as file:
-            for query, response in chat_history:
-                file.write(f"User: {query}\nBot: {response}\n\n")
+    # def save_chat_history(self,chat_history, folder_name, file_name):
+    #     folder_path = os.path.join(os.getcwd(), folder_name)
+    #     if not os.path.exists(folder_path):
+    #         os.makedirs(folder_path)
+    #     file_path = os.path.join(folder_path, file_name)
+    #     with open(file_path, "w", encoding="utf-8") as file:
+    #         for query, response in chat_history:
+    #             file.write(f"User: {query}\nBot: {response}\n\n")
+                
+    def get_documentation_context(self, query: str) -> Dict[str, Any]:
+        """
+        Get relevant documentation context using retriever tools.
+        
+        Args:
+            query: User's question
+        
+        Returns:
+            dict: Documentation context
+        """
+        # Get vector similarity results
+        vector_results = self.vector_tool.run(query)
+        
+        # Get cypher query results
+        cypher_results = self.cypher_tool.run(query)
+        
+        return {
+            "vector_results": vector_results,
+            "cypher_results": cypher_results,
+            "source": "neo4j_documentation",
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    def classify_documentation_query(self, query: str) -> Dict[str, bool]:
+        """
+        Classify if a query needs documentation retrieval.
+        
+        Args:
+            query: User's question
+        
+        Returns:
+            dict: Classification of documentation requirements
+        """
+        query_lower = query.lower()
+        
+        # Keywords that indicate documentation needs
+        documentation_keywords = [
+            'how to', 'setup', 'configure', 'install', 'procedure', 'manual',
+            'guide', 'steps', 'tutorial', 'programming', 'troubleshoot',
+            'documentation', 'explain', 'what is', 'describe'
+        ]
+        
+        # Component-specific keywords
+        component_keywords = [
+            'plc', 'tia portal', 'simatic', 's7-1500', 'txt controller',
+            'mqtt', 'opc ua', 'node-red', 'iot gateway', 'dashboard'
+        ]
+        
+        needs_documentation = any(keyword in query_lower for keyword in documentation_keywords)
+        is_component_query = any(keyword in query_lower for keyword in component_keywords)
+        
+        return {
+            'needs_documentation': needs_documentation or is_component_query,
+            'is_how_to_query': 'how to' in query_lower or 'how do' in query_lower,
+            'is_component_query': is_component_query,
+            'is_setup_query': any(word in query_lower for word in ['setup', 'configure', 'install']),
+            'is_troubleshoot_query': 'troubleshoot' in query_lower or 'problem' in query_lower
+        }
+    
+    def query(self, user_query: str) -> str:
+        """
+        Process a user query with full documentation context.
+        
+        Args:
+            user_query: User's question
+        
+        Returns:
+            str: Response with integrated documentation context
+        """
+        try:
+            # Get documentation context
+            doc_context = self.get_documentation_context(user_query)
+            
+            # Classify the query
+            query_classification = self.classify_documentation_query(user_query)
+            
+            # Prepare enhanced input for the conversation
+            enhanced_input = f"""
+            User Query: {user_query}
+            
+            Query Classification: {json.dumps(query_classification, indent=2)}
+            
+            Documentation Context:
+            Vector Search Results: {doc_context.get('vector_results', 'No vector results')}
+            
+            Cypher Query Results: {doc_context.get('cypher_results', 'No cypher results')}
+            
+            Based on the above context and documentation, please provide a comprehensive answer.
+            """
+            
+            # Use the existing conversation chain
+            response = self.conversation.predict(input=enhanced_input)
+            
+            return response
+            
+        except Exception as e:
+            return f"Error processing documentation query: {str(e)}"
+        
+    def get_neo4j_status(self) -> Dict[str, Any]:
+        """
+        Get a comprehensive overview of the current Neo4j system status.
+        
+        Returns:
+            dict: Complete system overview with all available data
+        """
+        # Return the status Neo4jDB connection
+        
+        index_info = graph.query("SHOW INDEXES")
+        
+        neo4j_status = {}
+
+        for index in index_info:
+            index_key = index['name']
+            neo4j_status[index_key] = {
+                'provider': index['indexProvider'],
+                'type': index['entityType'],
+                'state': index['state'],
+                'last_read': index['lastRead'].to_native().strftime("%Y-%m-%d %H:%M:%S UTC") if index['lastRead'] else None
+            }
+            
+        return neo4j_status
