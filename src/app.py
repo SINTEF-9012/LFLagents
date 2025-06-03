@@ -181,6 +181,7 @@ def process_query(query):
         "timestamp": datetime.now().isoformat()
     })
     
+    start_time = datetime.now()
     # Process the query with progress indication
     progress_bar = st.progress(0, text="Processing query...")
     
@@ -190,24 +191,30 @@ def process_query(query):
         if st.session_state.current_agent == "integrated":
             progress_bar.progress(50, text="Retrieving data...")
             response = agent.query(query)
+            response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
                 "agent_type": "integrated",
                 "timestamp": datetime.now().isoformat(),
-                "query_classification": agent.classify_query_type(query)
+                "query_classification": agent.classify_query_type(query),
+                "response_time_sec": response_time
             }
         elif st.session_state.current_agent == "monitoring":
             progress_bar.progress(50, text="Getting real-time data...")
             response = agent.query(query)
+            response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
                 "agent_type": "MonitoringAgent",
                 "connection_status": agent.get_sindit_status(),
+                "response_time_sec": response_time
             }
         elif st.session_state.current_agent == "retriever":
             progress_bar.progress(50, text="Searching documentation...")
             response = agent.query(query)
+            response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
                 "agent_type": "RetrieverAgent",
                 "connection_status": agent.get_neo4j_status(),
+                "response_time_sec": response_time
             }
         
         progress_bar.progress(100, text="Complete!")
