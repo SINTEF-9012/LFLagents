@@ -30,17 +30,9 @@ class IntegratedManufacturingAgent:
     def __init__(self):
         """Initialize the Integrated Agent with both retriever and monitoring capabilities."""
         
-        # Initialize sub-agents
         self.monitoring_agent = MonitoringAgent()
-        print("Monitoring agent initialized successfully")
-        # Initialize retriever agent
         self.retriever_agent = RetrieverAgent()
-        print("Retriever agent initialized successfully")
-        
-        # Initialize chat model
         self.llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
-        
-        # Initialize conversation chain
         self.initialize_conversation_chain()
     
     def initialize_conversation_chain(self):
@@ -119,16 +111,16 @@ class IntegratedManufacturingAgent:
         """
         query_lower = query.lower()
         
-        # Keywords that indicate real-time data needs
+        # Define keyword/phrase lists
         realtime_keywords = [
             'current', 'now', 'status', 'temperature', 'humidity', 'sensor',
-            'monitoring', 'real-time', 'live', 'today', 'latest', 'present'
+            'monitoring', 'real-time', 'live', 'today', 'latest', 'present',
+            'reading', 'value', 'measurement', 'data', 'active', 'connected'
         ]
-        
-        # Keywords that indicate documentation needs
         documentation_keywords = [
             'how to', 'setup', 'configure', 'install', 'procedure', 'manual',
-            'guide', 'steps', 'tutorial', 'programming', 'troubleshoot'
+            'guide', 'steps', 'tutorial', 'programming', 'troubleshoot', 'documentation',
+            'instruction', 'explain', 'reference'
         ]
         
         needs_realtime = any(keyword in query_lower for keyword in realtime_keywords)
@@ -140,34 +132,10 @@ class IntegratedManufacturingAgent:
             needs_documentation = True
         
         return {
-            'needs_realtime': needs_realtime,
-            'needs_documentation': needs_documentation,
-            'is_status_query': 'status' in query_lower,
-            'is_how_to_query': 'how to' in query_lower or 'how do' in query_lower
+            'MonitoringAgent': needs_realtime,
+            'RetrieverAgent': needs_documentation,
         }
     
-    
-    def get_realtime_context(self, query: str) -> Dict[str, Any]:
-        """
-        Get real-time monitoring context.
-        
-        Args:
-            query: User's question
-        
-        Returns:
-            dict: Real-time monitoring context
-        """
-        
-        # Get real-time data
-        realtime_data = self.monitoring_agent.get_real_time_data(query)
-        
-        # # Get status analysis
-        # status_analysis = self.monitoring_agent.analyze_manufacturing_status(query)
-        
-        return {
-            "realtime_data": realtime_data,
-            "source": "monitoring_agent"
-        }
 
     def query(self, user_query: str) -> str:
         """
@@ -190,23 +158,24 @@ class IntegratedManufacturingAgent:
         }
         
         # Get documentation context if needed
-        if query_classification['needs_documentation']:
+        if query_classification['RetrieverAgent']:
             doc_context = self.retriever_agent.get_documentation_context(user_query)
             context["documentation"] = doc_context
         
         # Get real-time context if needed
-        if query_classification['needs_realtime']:
-            realtime_context = self.get_realtime_context(user_query)
+        if query_classification['MonitoringAgent']:
+            realtime_context = self.monitoring_agent.get_realtime_context(user_query)
             context["realtime"] = realtime_context
                 
         # Format the input for the conversation chain
         formatted_input = f"""
         User Query: {user_query}
         
-        Query Classification: {json.dumps(query_classification, indent=2)}
+        Query Classification: 
+        {json.dumps(query_classification, indent=2)}
         
         Available Context:
-        {json.dumps(context, indent=2, default=str)}
+        {json.dumps(context, indent=3)}
         
         Please provide a comprehensive response that integrates both documentation knowledge 
         and real-time monitoring data as appropriate for this query.
@@ -216,15 +185,6 @@ class IntegratedManufacturingAgent:
         response = self.conversation_chain.run(input=formatted_input)
         
         return response
-    
-    def get_latest_context(self) -> Dict[str, Any]:
-        """
-        Get the latest context used for the last query.
-        
-        Returns:
-            dict: Latest context information
-        """
-        return self.latest_context if hasattr(self, 'latest_context') else {}
     
     def get_system_status(self) -> Dict[str, Any]:
         """

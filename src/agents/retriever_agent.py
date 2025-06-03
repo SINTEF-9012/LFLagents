@@ -201,7 +201,7 @@ class RetrieverAgent:
         return {
             "vector_results": vector_results,
             "cypher_results": cypher_results,
-            "source": "neo4j_documentation",
+            "source": "RetrieverAgent",
             "timestamp": datetime.now().isoformat()
         }
     

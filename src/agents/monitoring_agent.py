@@ -254,19 +254,24 @@ class MonitoringAgent:
             verbose=True
         )
     
-    def get_real_time_data(self, query: str, asset_type: str = None, property_type: str = None) -> Dict[str, Any]:
+    def get_realtime_context(self, query: str) -> Dict[str, Any]:
         """
-        Retrieve real-time manufacturing data.
+        Get real-time monitoring context.
         
         Args:
-            query: Natural language query about what data to retrieve
-            asset_type: Specific asset type to focus on (optional)
-            property_type: Specific property type to focus on (optional)
+            query: User's question
         
         Returns:
-            dict: Real-time data from SINDIT API
+            dict: Real-time monitoring context
         """
-        return self.sindit_data_tool.run(query)
+        
+        # Get real-time data
+        realtime_data = self.sindit_data_tool.run(query)
+        
+        return {
+            "realtime_data": realtime_data,
+            "source": "Monitoringgent"
+        }
     
     # def analyze_manufacturing_status(self, query: str, asset_type: str = None, property_type: str = None) -> Dict[str, Any]:
     #     """
@@ -293,7 +298,8 @@ class MonitoringAgent:
             str: Comprehensive response with real-time data analysis
         """
         # Retrieve real-time data relevant to the query by using the SINDIT data tool
-        real_time_data = self.get_real_time_data(user_query)
+        real_time_context = self.get_realtime_context(user_query)
+        real_time_data = real_time_context.get("realtime_data", {})
         
         # # Then analyze the manufacturing status by using the status analyzer tool
         # status_analysis = self.analyze_manufacturing_status(user_query)

@@ -28,7 +28,7 @@ def initialize_session_state():
     
     if 'current_agent' not in st.session_state:
         st.session_state.current_agent = "integrated"
-
+    
     if 'agent_instances' not in st.session_state:
         st.session_state.agent_instances = {}
 
@@ -199,15 +199,15 @@ def process_query(query):
             progress_bar.progress(50, text="Getting real-time data...")
             response = agent.query(query)
             metadata = {
-                "agent_type": "monitoring",
-                "timestamp": datetime.now().isoformat()
+                "agent_type": "MonitoringAgent",
+                "connection_status": agent.get_sindit_status(),
             }
         elif st.session_state.current_agent == "retriever":
             progress_bar.progress(50, text="Searching documentation...")
             response = agent.query(query)
             metadata = {
-                "agent_type": "retriever",
-                "timestamp": datetime.now().isoformat()
+                "agent_type": "RetrieverAgent",
+                "connection_status": agent.get_neo4j_status(),
             }
         
         progress_bar.progress(100, text="Complete!")
@@ -221,7 +221,6 @@ def process_query(query):
         })
         
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
         error_message = f"❌ Error processing query: {str(e)}"
         st.session_state.chat_history.append({
             "role": "assistant",
