@@ -2,8 +2,10 @@ import os
 import pandas as pd
 import numpy as np
 
-# Path to the factory data directory
-FACTORY_DIR = '../factory_data'
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+FACTORY_DIR = './factory_data'
 
 FACTORY_COMPONENT_CONFIG = {
     'DPS': {  # Deliver and Pick-up Station
@@ -58,8 +60,11 @@ def load_and_filter_data(file_path, time_range):
         # Convert time column
         if 'time' in df.columns:
             df['time'] = pd.to_datetime(df['time'], format='mixed', utc=True)
+            # Convert time_range to timezone-aware if needed
+            start_time = pd.to_datetime(time_range[0]).tz_localize('UTC') if pd.to_datetime(time_range[0]).tz is None else pd.to_datetime(time_range[0])
+            end_time = pd.to_datetime(time_range[1]).tz_localize('UTC') if pd.to_datetime(time_range[1]).tz is None else pd.to_datetime(time_range[1])
             # Filter by time range
-            df = df[(df['time'] >= time_range[0]) & (df['time'] <= time_range[-1])]
+            df = df[(df['time'] >= start_time) & (df['time'] <= end_time)]
         
         return df
     except Exception as e:
