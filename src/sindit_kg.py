@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # 2. Register streaming properties
     streaming_properties = load_json(os.path.join(os.path.dirname(__file__), 'config/streaming_properties.json'))
     for prop in streaming_properties:
-        query_post_api('kg/node', prop)
+        query_post_api('kg/streaming_property', prop)
         print(f"Registered streaming property: {prop['uri']}")
 
     # 3. Register assets (factory sensor, camera, vgr, hbw, sld, mpo, dso, dsi, order)
@@ -21,3 +21,4 @@ if __name__ == "__main__":
     # 4. Register sindit_kg
     sindit_kg = load_json(os.path.join(os.path.dirname(__file__), 'config/sindit_kg.json'))
     query_post_api('kg/sindit_kg', sindit_kg)
+    print(f"Registered SINDIT KG: {sindit_kg['uri']}")
