@@ -5,6 +5,7 @@ if __name__ == "__main__":
     # 1. Register connection
     connection = load_json(os.path.join(os.path.dirname(__file__), 'config/connections.json'))
     query_post_api('kg/connection', connection)
+    print(f"Registered Connection: {connection['uri']}")
 
     # 2. Register streaming properties
     streaming_properties = load_json(os.path.join(os.path.dirname(__file__), 'config/streaming_properties.json'))
