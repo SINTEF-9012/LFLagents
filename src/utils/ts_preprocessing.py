@@ -2,12 +2,21 @@ import os
 import pandas as pd
 import numpy as np
 
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-
+# Path to the factory data directory
 FACTORY_DIR = './factory_data'
 
 FACTORY_COMPONENT_CONFIG = {
+    'FACTORY': {  # Factory overview
+        'files': [
+            'vgr_status_code.csv', 'vgr_actual_pos_horizontal.csv', 'vgr_actual_pos_rotation.csv', 'vgr_actual_pos_vertical.csv', 'vgr_target_status.csv',
+            'hbw_status_code.csv', 'hbw_actual_pos_horizontal.csv', 'hbw_actual_pos_vertical.csv',
+            'mpo_status_code.csv',
+            'sld_status_code.csv',
+            'dps_dsi_status_code.csv',
+            'dps_dso_status_code.csv',
+        ],
+        'description': 'Factory Overview (VGR, HBW, MPO, SLD, DSO)'
+    },
     'DPS': {  # Deliver and Pick-up Station
         'files': ['dps_dsi_active_status.csv', 'dps_dsi_status_code.csv', 
                  'dps_dso_active_status.csv', 'dps_dso_status_code.csv'],
@@ -19,24 +28,24 @@ FACTORY_COMPONENT_CONFIG = {
         'description': 'Environmental Station with Surveillance Camera'
     },
     'VGR': {  # Vacuum Gripper Robot
-        'files': ['vgr_active_status.csv', 'vgr_status_code.csv',
+        'files': ['vgr_status_code.csv',
                  'vgr_actual_pos_horizontal.csv', 'vgr_actual_pos_rotation.csv', 'vgr_actual_pos_vertical.csv',
                  'vgr_target_pos_horizontal.csv', 'vgr_target_pos_rotation.csv', 'vgr_target_pos_vertical.csv',
                  'vgr_target_status.csv'],
         'description': 'Vacuum Gripper Robot'
     },
     'HBW': {  # Automated High-bay Warehouse
-        'files': ['hbw_active_status.csv', 'hbw_status_code.csv',
+        'files': ['hbw_status_code.csv',
                  'hbw_actual_pos_horizontal.csv', 'hbw_actual_pos_vertical.csv',
                  'hbw_target_pos_horizontal.csv', 'hbw_target_pos_vertical.csv'],
         'description': 'Automated High-bay Warehouse'
     },
     'MPO': {  # Multi-Processing Station with kiln
-        'files': ['mpo_active_status.csv', 'mpo_status_code.csv'],
+        'files': ['mpo_status_code.csv'],
         'description': 'Multi-Processing Station with Kiln'
     },
     'SLD': {  # Sorting Line with Color Detection
-        'files': ['sld_active_status.csv', 'sld_status_code.csv'],
+        'files': ['sld_status_code.csv'],
         'description': 'Sorting Line with Color Detection'
     },
     'ENVIRONMENTAL': {  # Environmental sensors
@@ -50,7 +59,7 @@ FACTORY_COMPONENT_CONFIG = {
     'CAMERA': {  # Camera positioning
         'files': ['camera_relative_position_pan.csv', 'camera_relative_position_tilt.csv'],
         'description': 'Camera Positioning System'
-    }
+    },
 }
 
 def load_and_filter_data(file_path, time_range):
@@ -91,13 +100,6 @@ def load_requested_component_data(component, time_range):
 def merge_and_resample_component_data(data, resample_interval='5S'):
     """Resample data and merge all data on time"""
     
-    # Define aggregation rules for different data types, other types will use 'mean' by default
-    agg_rules = {
-        'status_code': 'max',  # Use max for status codes (1-4)
-        'active_status': 'max',  # Convert True/False to 1/0 and take max
-        'target_status': 'mode'  # Use mode for categorical station names
-    }
-    
     resampled_dfs = []
     
     for component, df in data.items():
@@ -105,16 +107,16 @@ def merge_and_resample_component_data(data, resample_interval='5S'):
             # Extract time and value columns
             clean_df = df[['time', 'value']].copy()
             
-            # Handle boolean active_status data
-            if component == 'active_status':
-                # Convert True/False to 1/0 for numerical operations
-                clean_df['value'] = clean_df['value'].astype(int)
-            
             # Set time as index and resample
             df_indexed = clean_df.set_index('time')
             
-            # Get aggregation method for this data type
-            agg_method = agg_rules.get(component, 'mean')
+            # Get aggregation method for this data type using pattern matching
+            if 'target_status' in component:
+                agg_method = 'mode'
+            elif 'status_code' in component or 'active_status' in component:
+                agg_method = 'max'
+            else:
+                agg_method = 'mean'
             
             if agg_method == 'mode':
                 # Use mode for categorical data (like target_status)
@@ -137,10 +139,10 @@ def merge_and_resample_component_data(data, resample_interval='5S'):
         return merged_resampled
     else:
         return None
-    
+   
 def load_resampled_requested_components(components, time_range, resample_interval='5S'):
     """Load and process final data for a list of requested components"""
-    
+   
     data = {}
     for component in components:
         print(f"Loading data for component: {component}")
