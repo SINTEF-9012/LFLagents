@@ -42,7 +42,7 @@
         "streamingPath": "iaq"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#AirPressure",
         "label": "AirPressure",
         "propertyDescription": "AirPressure [hPa]",
@@ -53,7 +53,7 @@
         "streamingPath": "p"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#GasResistance",
         "label": "GasResistance",
         "propertyDescription": "Gas Resistance [Ohm]",
@@ -64,7 +64,7 @@
         "streamingPath": "gr"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#Brightness",
         "label": "Brightness",
         "propertyUnit": {"uri": "urn:samm:org.eclipse.esmf.samm:unit:2.1.0#percent"},
@@ -75,7 +75,7 @@
         "streamingPath": "br"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#LDR",
         "label": "LDR",
         "propertyDescription": "Value resistance 0-15000 [Ohm]",
@@ -86,7 +86,7 @@
         "streamingPath": "ldr"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#CameraData",
         "label": "CameraData",
         "propertyDescription": "camera image as base64 string",
@@ -96,7 +96,7 @@
         "streamingPath": "data['data']"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#CameraPosPan",
         "label": "CameraPosPan",
         "propertyDescription": "relative position pan: -1.000,1.000",
@@ -106,7 +106,7 @@
         "streamingPath": "pan"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#CameraPosTilt",
         "label": "CameraPosTilt",
         "propertyDescription": "relative position tilt: -1.000,1.000",
@@ -116,7 +116,7 @@
         "streamingPath": "tilt"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#Stock",
         "label": "Stock",
         "propertyDescription": "workpiece data in JSON format",
@@ -126,7 +126,7 @@
         "streamingPath": "stockItems"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#OrderState",
         "label": "OrderState",
         "propertyDescription": "State of the order item including WAITING_FOR_ORDER, ORDERED, IN_PROCESS, SHIPPED",
@@ -136,7 +136,7 @@
         "streamingPath": "state"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#OrderType",
         "label": "OrderType",
         "propertyDescription": "Type of the order item including WHITE, BLUE, RED",
@@ -146,7 +146,7 @@
         "streamingPath": "type"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#OrderLatestType",
         "label": "OrderLatestType",
         "propertyDescription": "Type of the latest order item including WHITE, BLUE, RED",
@@ -156,7 +156,7 @@
         "streamingPath": "type"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#vgrStation",
         "label": "vgrStation",
         "propertyDescription": "Station name of Vacuum suction gripper (vgr)",
@@ -166,7 +166,7 @@
         "streamingPath": "station"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#vgrCode",
         "label": "vgrCode",
         "propertyDescription": "Status code for vgr",
@@ -176,7 +176,7 @@
         "streamingPath": "code"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#vgrActive",
         "label": "vgrActive",
         "propertyDescription": "Active status for vgr",
@@ -186,7 +186,7 @@
         "streamingPath": "active"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#vgrTarget",
         "label": "vgrTarget",
         "propertyDescription": "The next destination for vgr. This can be empty (no target assigned) or the name of the next station vgr should move to.",
@@ -196,7 +196,7 @@
         "streamingPath": "target"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#hbwStation",
         "label": "hbwStation",
         "propertyDescription": "Station name of High-bay warehouse (hbw)",
@@ -206,7 +206,7 @@
         "streamingPath": "station"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#hbwCode",
         "label": "hbwCode",
         "propertyDescription": "Status code for hbw",
@@ -216,7 +216,7 @@
         "streamingPath": "code"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#hbwActive",
         "label": "hbwActive",
         "propertyDescription": "Active status for hbw",
@@ -226,7 +226,7 @@
         "streamingPath": "active"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#hbwTarget",
         "label": "hbwTarget",
         "propertyDescription": "The next destination for hbw. This can be empty (no target assigned) or the name of the next station hbw should move to.",
@@ -236,7 +236,7 @@
         "streamingPath": "target"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#sldStation",
         "label": "sldStation",
         "propertyDescription": "Station name of Sorting line (sld)",
@@ -246,7 +246,7 @@
         "streamingPath": "station"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#sldCode",
         "label": "sldCode",
         "propertyDescription": "Status code for sld",
@@ -256,7 +256,7 @@
         "streamingPath": "code"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#sldActive",
         "label": "sldActive",
         "propertyDescription": "Active status for sld",
@@ -266,7 +266,7 @@
         "streamingPath": "active"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#sldTarget",
         "label": "sldTarget",
         "propertyDescription": "The next destination for sld. This can be empty (no target assigned) or the name of the next station sld should move to.",
@@ -276,7 +276,7 @@
         "streamingPath": "target"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#mpoStation",
         "label": "mpoStation",
         "propertyDescription": "Station name of Multi-Processing Station (mpo)",
@@ -286,7 +286,7 @@
         "streamingPath": "station"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#mpoCode",
         "label": "mpoCode",
         "propertyDescription": "Status code for mpo",
@@ -296,7 +296,7 @@
         "streamingPath": "code"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#mpoActive",
         "label": "mpoActive",
         "propertyDescription": "Active status for mpo",
@@ -306,7 +306,7 @@
         "streamingPath": "active"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#mpoTarget",
         "label": "mpoTarget",
         "propertyDescription": "The next destination for mpo. This can be empty (no target assigned) or the name of the next station mpo should move to.",
@@ -316,7 +316,7 @@
         "streamingPath": "target"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsoStation",
         "label": "dsoStation",
         "propertyDescription": "Station name of DSO",
@@ -326,7 +326,7 @@
         "streamingPath": "station"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsoCode",
         "label": "dsoCode",
         "propertyDescription": "Status code for dso",
@@ -336,7 +336,7 @@
         "streamingPath": "code"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsoActive",
         "label": "dsoActive",
         "propertyDescription": "Active status for dso",
@@ -346,7 +346,7 @@
         "streamingPath": "active"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsoTarget",
         "label": "dsoTarget",
         "propertyDescription": "The next destination for dso. This can be empty (no target assigned) or the name of the next station dso should move to.",
@@ -356,7 +356,7 @@
         "streamingPath": "target"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsiStation",
         "label": "dsiStation",
         "propertyDescription": "Station name of DSI",
@@ -366,7 +366,7 @@
         "streamingPath": "station"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsiCode",
         "label": "dsiCode",
         "propertyDescription": "Status code for dsi",
@@ -376,7 +376,7 @@
         "streamingPath": "code"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsiActive",
         "label": "dsiActive",
         "propertyDescription": "Active status for dsi",
@@ -386,7 +386,7 @@
         "streamingPath": "active"
     },
     {
-        "class_uri": "urn:samm:sindit.no:1.0.0#StreamingProperty",
+        "class_uri": "urn:samm:sindit.sintef.no:1.0.0#StreamingProperty",
         "uri": "http://sindit.sintef.no/2.0#dsiTarget",
         "label": "dsiTarget",
         "propertyDescription": "The next destination for dsi. This can be empty (no target assigned) or the name of the next station dsi should move to.",
