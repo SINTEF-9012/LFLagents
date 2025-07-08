@@ -2,8 +2,10 @@ import os
 import pandas as pd
 import numpy as np
 
-# Path to the factory data directory
-FACTORY_DIR = './factory_data'
+# Path to the factory data directory - use absolute path relative to this file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+FACTORY_DIR = os.path.join(project_root, 'factory_data')
 
 FACTORY_COMPONENT_CONFIG = {
     'FACTORY': {  # Factory overview

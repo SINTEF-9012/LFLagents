@@ -25,13 +25,6 @@ from utils.ts_preprocessing import (
     FACTORY_COMPONENT_CONFIG
 )
 
-# Set page configuration
-st.set_page_config(
-    page_title="Factory Data Dashboard",
-    page_icon="🏭",
-    layout="wide"
-)
-
 def visualize_component_activity(component_data, component_name, resample_interval='5S'):
     """
     Visualize component activity with position data, status highlighting, and target movements
