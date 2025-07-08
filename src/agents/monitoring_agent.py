@@ -74,13 +74,13 @@ class SINDITDataTool(BaseTool):
 
     def _run(self, query: str, **kwargs):
         """
-        Retrieve real-time data from SINDIT API based on the query.
+        Retrieve real-time data from SINDIT DT Platform based on the query.
         
         Args:
             query: Natural language query about manufacturing data
         
         Returns:
-            dict: Real-time data from SINDIT API
+            dict: Real-time data from SINDIT DT Platform
         """
         
         relevant_assets = self.classify_query(query)
@@ -324,7 +324,7 @@ class MonitoringAgent:
         Retrieve connection info of MQTT connections from SINDIT Knowledge Graph API.
         
         Returns:
-            dict: Real-time data from SINDIT API
+            dict: Real-time data from SINDIT DT Platform
         """
 
         return query_get_connections_info('kg/node', "http://sindit.sintef.no/2.0#mqtt-connection")
