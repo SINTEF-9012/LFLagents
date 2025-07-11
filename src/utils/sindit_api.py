@@ -31,6 +31,30 @@ def get_token():
 def load_json(filepath: str):
     with open(filepath, 'r') as f:
         return json.load(f)
+    
+def load_mqtt_config(filepath: str):
+    """Load MQTT config from template with environment variable substitution"""
+    
+    from string import Template
+
+    # Read template
+    with open(filepath, 'r') as file:
+        template_content = file.read()
+    
+    # Create template object
+    template = Template(template_content)
+    
+    # Substitute environment variables
+    config_content = template.substitute(
+        MQTT_BROKER_HOST=os.getenv('MQTT_BROKER_HOST'),
+        MQTT_BROKER_PORT=os.getenv('MQTT_BROKER_PORT'),
+        MQTT_BROKER_USERNAME=os.getenv('MQTT_BROKER_USERNAME')
+    )
+    
+    # Parse as JSON
+    config = json.loads(config_content)
+    
+    return config
 
 def query_get_api(endpoint: str, uri: str = None, uri_key: str = "node_uri") -> dict:
     """
@@ -115,6 +139,24 @@ def query_post_api(endpoint: str, json: dict) -> dict:
         "Content-Type": "application/json"
     }
     response = requests.post(f'{SINDIT2_API_URL}/{endpoint}', json=json, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f'Error: {response.status_code}: {response.text}')
+
+def query_post_vault_mqtt_pass():
+    TOKEN = get_token()
+    
+    headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    SECRET_PATH = "mqtt_pass"
+    SECRET_VALUE = os.getenv("MQTT_BROKER_PASSWORD")
+      
+    response = requests.post(f'{SINDIT2_API_URL}/vault/secret?secret_path={SECRET_PATH}&secret_value={SECRET_VALUE}', headers=headers)
     if response.status_code == 200:
         return response.json()
     else:
