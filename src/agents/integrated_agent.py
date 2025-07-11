@@ -23,7 +23,7 @@ class IntegratedManufacturingAgent:
     
     This agent provides comprehensive manufacturing support by:
     1. Retrieving documentation and manuals from Neo4j (via RetrieverAgent)
-    2. Monitoring real-time manufacturing data from SINDIT API (via MonitoringAgent)
+    2. Monitoring real-time manufacturing data from SINDIT DT platform (via MonitoringAgent)
     3. Providing unified responses that combine both static knowledge and live data
     """
     
@@ -54,7 +54,7 @@ class IntegratedManufacturingAgent:
             - Educational simulations and programming tasks
             - System setup, networking, and troubleshooting guides
 
-            REAL-TIME MONITORING (via SINDIT API):
+            REAL-TIME MONITORING (via SINDIT DT Platform):
             - Live sensor data (temperature, humidity, air quality, brightness)
             - Manufacturing equipment status (VGR, HBW, SLD, MPO, DSO, DSI)
                 - VGR: Vacuum Gripper Robot
@@ -207,19 +207,19 @@ class IntegratedManufacturingAgent:
             
         return status
     
-    def get_manufacturing_insights(self) -> str:
-        """
-        Generate comprehensive manufacturing insights.
+    # def get_manufacturing_insights(self) -> str:
+    #     """
+    #     Generate comprehensive manufacturing insights.
         
-        Returns:
-            str: Detailed insights about current manufacturing status
-        """
-        insights_query = """
-            "Provide comprehensive insights about the current manufacturing system including:\n"
-            "1. Current sensor readings and environmental conditions\n"
-            "2. Equipment status and operational efficiency\n"
-            "3. System health and connectivity status\n"
-        """
+    #     Returns:
+    #         str: Detailed insights about current manufacturing status
+    #     """
+    #     insights_query = """
+    #         "Provide comprehensive insights about the current manufacturing system including:\n"
+    #         "1. Current sensor readings and environmental conditions\n"
+    #         "2. Equipment status and operational efficiency\n"
+    #         "3. System health and connectivity status\n"
+    #     """
         
-        return self.query(insights_query)
+    #     return self.query(insights_query)
     
