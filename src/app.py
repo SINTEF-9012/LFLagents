@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 
 # Add the src directory to the path
@@ -12,6 +12,9 @@ from agents.integrated_agent import IntegratedManufacturingAgent
 from agents.monitoring_agent import MonitoringAgent
 from agents.retriever_agent import RetrieverAgent
 from agents.analytics_agent import AnalyticsAgent
+
+# Import utilities for enhanced analytics features
+from utils.llm_image_explanation import LLMImageAnalyzer, ChartImageSaver, generate_comprehensive_process_explanation
 
 
 # Page configuration
@@ -41,6 +44,12 @@ def initialize_session_state():
         start_time = datetime(2022, 12, 2, 14, 0, 0)
         end_time = datetime(2022, 12, 2, 14, 30, 0)
         st.session_state.selected_time_range = (start_time, end_time)
+    
+    if 'llm_analyzer' not in st.session_state:
+        st.session_state.llm_analyzer = LLMImageAnalyzer()
+    
+    if 'chart_saver' not in st.session_state:
+        st.session_state.chart_saver = ChartImageSaver()
 
 def get_agent_instance(agent_type):
     """Get or create an agent instance."""
@@ -61,24 +70,51 @@ def get_agent_instance(agent_type):
     return st.session_state.agent_instances.get(agent_type)
 
 def display_chat_history():
-    """Display chat history."""
-    for message in st.session_state.chat_history:
+    """Display chat history with support for analytics agent features."""
+    for i, message in enumerate(st.session_state.chat_history):
         with st.chat_message(message["role"]):
             if message["role"] == "assistant":
                 st.markdown(message["content"])
+                
+                # Display chart if available (only once per message)
+                if "chart_figure" in message and message["chart_figure"]:
+                    try:
+                        # Use a unique key to prevent Plotly ID conflicts
+                        unique_key = f"chart_{i}_{message.get('timestamp', 'unknown')}"
+                        st.plotly_chart(message["chart_figure"], use_container_width=True, key=unique_key)
+                    except Exception as e:
+                        st.warning(f"Could not display interactive chart: {e}")
+                        # Fallback to PNG if interactive chart fails
+                        if "chart_path" in message and message["chart_path"]:
+                            try:
+                                st.image(message["chart_path"], caption="Process Analysis Chart", use_column_width=True)
+                            except Exception as e2:
+                                st.warning(f"Could not display chart image either: {e2}")
+                
+                # Display chart image if available but no plotly figure
+                elif "chart_path" in message and message["chart_path"]:
+                    try:
+                        st.image(message["chart_path"], caption="Process Analysis Chart", use_column_width=True)
+                    except Exception as e:
+                        st.warning(f"Could not display chart: {e}")
+                
                 if "metadata" in message:
                     with st.expander("Response Details"):
                         st.json(message["metadata"])
             else:
                 st.markdown(message["content"])
 
-def process_query(query):
+def process_query(query, progress_container=None):
     """Process a user query with the selected agent."""
     agent = get_agent_instance(st.session_state.current_agent)
     
     if not agent:
         st.error(f"Agent '{st.session_state.current_agent}' not available")
         return
+    
+    # Initialize variables to avoid undefined variable errors
+    response = ""
+    metadata = {}
     
     # Add user message to chat history
     st.session_state.chat_history.append({
@@ -88,14 +124,20 @@ def process_query(query):
     })
     
     start_time = datetime.now()
-    # Process the query with progress indication
-    progress_bar = st.progress(0, text="Processing query...")
+    
+    # Use provided progress container or create a new one
+    if progress_container is None:
+        progress_container = st.empty()
     
     try:
-        progress_bar.progress(25, text="Initializing...")
+        # Process the query with progress indication
+        with progress_container:
+            progress_bar = st.progress(0, text="Processing query...")
+            progress_bar.progress(25, text="Initializing...")
         
         if st.session_state.current_agent == "integrated":
-            progress_bar.progress(50, text="Retrieving data...")
+            with progress_container:
+                progress_bar.progress(50, text="Retrieving data...")
             response = agent.query(query)
             response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
@@ -105,7 +147,8 @@ def process_query(query):
                 "response_time_sec": response_time
             }
         elif st.session_state.current_agent == "monitoring":
-            progress_bar.progress(50, text="Getting real-time data...")
+            with progress_container:
+                progress_bar.progress(50, text="Getting real-time data...")
             response = agent.query(query)
             response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
@@ -114,7 +157,8 @@ def process_query(query):
                 "response_time_sec": response_time
             }
         elif st.session_state.current_agent == "retriever":
-            progress_bar.progress(50, text="Searching documentation...")
+            with progress_container:
+                progress_bar.progress(50, text="Searching documentation...")
             response = agent.query(query)
             response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
@@ -123,23 +167,109 @@ def process_query(query):
                 "response_time_sec": response_time
             }
         elif st.session_state.current_agent == "analytics":
-            progress_bar.progress(50, text="Analyzing factory data...")
-            response = agent.query(query)
+            with progress_container:
+                progress_bar.progress(50, text="Analyzing factory data...")
+            result = agent.query(query)
             response_time = (datetime.now() - start_time).total_seconds()
-            metadata = {
-                "agent_type": "AnalyticsAgent",
-                "response_time_sec": response_time
-            }
+            
+            # Handle the new dictionary response format from analytics agent
+            if isinstance(result, dict):
+                response = result.get('llm_analysis', result.get('response', 'No response generated'))
+                chart_path = result.get('chart_path')
+                chart_figure = None
+                llm_explanation = result.get('llm_analysis')
+                time_range = result.get('time_range')
+                query_type = result.get('query_type', 'process_analysis')  # Get query type from analytics agent
+                
+                # Generate interactive chart using viz.py (like in dashboard)
+                if result.get('success', False) and time_range:
+                    try:
+                        with progress_container:
+                            progress_bar.progress(75, text="Generating interactive chart...")
+                        
+                        # Get the primary component from the analytics agent result
+                        primary_component = result.get('primary_component', 'FACTORY')
+                        
+                        # Load the appropriate component data based on the query type
+                        if primary_component not in agent.loaded_data or agent.loaded_data[primary_component].empty:
+                            agent.load_component_data([primary_component], time_range)
+                        
+                        component_data = agent.loaded_data.get(primary_component)
+                        
+                        if component_data is not None and not component_data.empty:
+                            # Import visualization functions
+                            from viz import visualize_factory_overview, visualize_environmental_data, visualize_component_activity
+                            
+                            # Generate the appropriate chart based on component type
+                            if primary_component == 'ENVIRONMENTAL':
+                                chart_figure = visualize_environmental_data(component_data)
+                            elif primary_component == 'FACTORY':
+                                chart_figure = visualize_factory_overview(component_data, '5S')
+                            else:
+                                chart_figure = visualize_component_activity(component_data, primary_component, '5S')
+                            
+                            # Only generate LLM explanation for process analysis queries (not environmental)
+                            query_type = result.get('query_type', 'process_analysis')
+                            if chart_figure is not None and query_type == 'process_analysis':
+                                # Get data summary for LLM analysis
+                                data_summary = agent.generate_process_data_summary(time_range)
+                                
+                                # Generate enhanced LLM explanation with custom prompt
+                                # Save chart temporarily for LLM analysis
+                                if chart_path:
+                                    enhanced_explanation = generate_comprehensive_process_explanation(
+                                        chart_path,
+                                        data_summary,
+                                        f"User query: {query}\n\nPlease provide a comprehensive analysis addressing the user's specific question about the {primary_component.lower()} data."
+                                    )
+                                    if enhanced_explanation:
+                                        response = enhanced_explanation
+                                
+                    except Exception as e:
+                        print(f"Error generating interactive chart: {e}")
+                        # Fallback to original response
+                
+                metadata = {
+                    "agent_type": "AnalyticsAgent",
+                    "response_time_sec": response_time,
+                    "chart_generated": chart_path is not None or chart_figure is not None,
+                    "llm_analysis": query_type == 'process_analysis' and llm_explanation is not None,
+                    "time_range": f"{time_range[0]} to {time_range[1]}" if time_range else None
+                }
+            else:
+                # Backward compatibility for string responses
+                response = result
+                chart_path = None
+                chart_figure = None
+                llm_explanation = None
+                query_type = 'process_analysis'
+                metadata = {
+                    "agent_type": "AnalyticsAgent",
+                    "response_time_sec": response_time,
+                    "chart_generated": False,
+                    "llm_analysis": False,
+                    "time_range": None
+                }
         
-        progress_bar.progress(100, text="Complete!")
+        with progress_container:
+            progress_bar.progress(100, text="Complete!")
         
         # Add assistant response to chat history
-        st.session_state.chat_history.append({
+        response_entry = {
             "role": "assistant",
             "content": response,
             "timestamp": datetime.now().isoformat(),
             "metadata": metadata
-        })
+        }
+        
+        # Add chart data for analytics agent if available
+        if st.session_state.current_agent == "analytics":
+            if 'chart_path' in locals() and chart_path:
+                response_entry["chart_path"] = chart_path
+            if 'chart_figure' in locals() and chart_figure:
+                response_entry["chart_figure"] = chart_figure
+        
+        st.session_state.chat_history.append(response_entry)
         
     except Exception as e:
         error_message = f"❌ Error processing query: {str(e)}"
@@ -150,7 +280,8 @@ def process_query(query):
             "metadata": {"error": True, "error_type": type(e).__name__}
         })
     finally:
-        progress_bar.empty()
+        # Clear the progress bar
+        progress_container.empty()
         
 def display_analytics_dashboard():
     """Display the analytics dashboard with visualizations from the viz.py module."""
@@ -189,16 +320,30 @@ def display_analytics_dashboard():
                     with col2:
                         st.metric("Active Time", f"{metrics.get('active_time_minutes', 0)} min")
                     
-                    with col3:
-                        st.metric("VGR Targets", metrics.get("vgr_target_count", 0))
-                    
-                    with col4:
-                        # Find the component with highest activity
-                        activity_metrics = {k: v for k, v in metrics.items() if k.endswith('_active_pct') and not k.startswith('avg')}
-                        if activity_metrics:
-                            max_component = max(activity_metrics.items(), key=lambda x: x[1])
-                            component_name = max_component[0].replace('_active_pct', '')
-                            st.metric("Most Active", f"{component_name} ({max_component[1]}%)")
+                    # Add cycle analysis metrics if available
+                    try:
+                        # Get cycle analysis
+                        if 'FACTORY' in analytics_agent.loaded_data:
+                            cycle_analysis = analytics_agent.analyze_cycles()
+                            
+                            with col3:
+                                st.metric("Process Cycles", cycle_analysis.get('cycle_count', 0))
+                            
+                            with col4:
+                                st.metric("Avg Cycle Duration", f"{cycle_analysis.get('avg_cycle_duration', 0):.1f} min")
+                            
+                            # Hide cycle details for now - they don't display well
+                            # if cycle_analysis.get('cycle_details'):
+                            #     st.subheader("🔄 Process Cycle Details")
+                            #     with st.expander("View Individual Cycles", expanded=False):
+                            #         for cycle in cycle_analysis['cycle_details']:
+                            #             st.write(f"**Cycle {cycle['cycle_number']}**: {cycle['start_time']} "
+                            #                    f"({cycle['duration_minutes']}min) - {cycle['process_type']}")
+                            #             if cycle['active_components']:
+                            #                 st.write(f"   Active: {', '.join(cycle['active_components'])}")
+                            #             st.write("---")
+                    except Exception as e:
+                        st.warning(f"Could not load cycle analysis: {e}")
                 
                 elif selected_component == "ENVIRONMENTAL":
                     # For environmental data, show temperature, humidity, etc.
@@ -241,10 +386,7 @@ def display_analytics_dashboard():
             if 'component_data' in st.session_state and selected_component in st.session_state.component_data:
                 component_data = st.session_state.component_data[selected_component]
                 
-                # Import visualization functions here to avoid circular imports
-                import sys
-                import os
-                sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+                # Import visualization functions directly from viz.py
                 from viz import visualize_component_activity, visualize_factory_overview, visualize_environmental_data
                 
                 # Create appropriate visualization based on component type
@@ -257,6 +399,62 @@ def display_analytics_dashboard():
                 
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Add LLM analysis section for the dashboard chart
+                    with st.expander("Chart Analysis"):
+                        st.markdown("AI-powered analysis of the chart patterns and process insights")
+                        
+                        # Custom analysis prompt section
+                        custom_prompt = st.text_area(
+                            "Enter the custom prompt below (optional)",
+                            placeholder="e.g., 'Focus on VGR positioning accuracy' or 'Analyze HBW storage efficiency'",
+                            help="Provide specific questions or focus areas for the AI analysis. Leave blank for standard process analysis.",
+                            height=80
+                        )
+                        
+                        # Analyze button
+                        analyze_button = st.button("🔍 Analyze Chart", use_container_width=True)
+                        
+                        if analyze_button:
+                            with st.spinner("Analyzing chart"):
+                                # Get the analytics agent and use its method
+                                analytics_agent = get_agent_instance("analytics")
+                                if analytics_agent:
+                                    try:
+                                        # Use custom prompt if provided, otherwise use smart analysis
+                                        time_range = st.session_state.get('selected_time_range', analytics_agent.default_time_range)
+                                        
+                                        # Generate data summary for LLM analysis
+                                        data_summary = analytics_agent.generate_process_data_summary(time_range)
+                                        
+                                        # Save chart temporarily for LLM analysis
+                                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                                        temp_chart_path = os.path.join(analytics_agent.charts_dir, f'temp_analysis_{timestamp}.png')
+                                        
+                                        # Save the chart
+                                        success = analytics_agent.chart_saver.save_chart(fig, temp_chart_path)
+                                        
+                                        if success and os.path.exists(temp_chart_path):
+                                            # Use LLM to analyze the chart
+                                            analysis = generate_comprehensive_process_explanation(
+                                                temp_chart_path,
+                                                data_summary,
+                                                custom_prompt if custom_prompt and custom_prompt.strip() else None
+                                            )
+                                            
+                                            st.markdown(analysis)
+                                            
+                                            # Clean up temporary file
+                                            try:
+                                                os.remove(temp_chart_path)
+                                            except:
+                                                pass
+                                        else:
+                                            st.error("Could not save chart for analysis")
+                                    except Exception as e:
+                                        st.error(f"Error analyzing chart: {str(e)}")
+                                else:
+                                    st.error("Analytics agent not available")
                 else:
                     st.warning("No visualization available for the selected data.")
             else:
@@ -268,42 +466,21 @@ def display_analytics_dashboard():
             st.error(f"Error generating visualization: {str(e)}")
             st.exception(e)
         
-        # Display raw data and insights
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            with st.expander("Insights"):
-                try:
-                    insights = analytics_agent.get_anomaly_insights(selected_component)
-                    if insights:
-                        for insight in insights:
-                            st.markdown(f"**{insight['type'].replace('_', ' ').title()}**")
-                            st.markdown(f"{insight['description']}")
-                            if 'count' in insight:
-                                st.markdown(f"Occurrences: {insight['count']}")
-                            if 'duration_seconds' in insight:
-                                st.markdown(f"Duration: {insight['duration_seconds']} seconds")
-                            st.markdown("---")
-                    else:
-                        st.info("No significant insights detected in the current data.")
-                except Exception as e:
-                    st.warning(f"Could not generate insights: {str(e)}")
-        
-        with col2:
-            with st.expander("Raw Data"):
-                if 'component_data' in st.session_state and selected_component in st.session_state.component_data:
-                    st.dataframe(st.session_state.component_data[selected_component].head(100))
-                    
-                    # Download option
-                    csv = st.session_state.component_data[selected_component].to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="Download CSV",
-                        data=csv,
-                        file_name=f"{selected_component.lower()}_data.csv",
-                        mime='text/csv'
-                    )
-                else:
-                    st.info("No data loaded. Use the sidebar controls to load data first.")
+        # Display raw data
+        with st.expander("Raw Data"):
+            if 'component_data' in st.session_state and selected_component in st.session_state.component_data:
+                st.dataframe(st.session_state.component_data[selected_component].head(100))
+                
+                # Download option
+                csv = st.session_state.component_data[selected_component].to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download CSV",
+                    data=csv,
+                    file_name=f"{selected_component.lower()}_data.csv",
+                    mime='text/csv'
+                )
+            else:
+                st.info("No data loaded. Use the sidebar controls to load data first.")
 
 def main():
     """Main application function."""
@@ -313,7 +490,6 @@ def main():
     
     # Header
     st.title("🏭 Manufacturing Assistant")
-    st.markdown("**fischertechnik Training Factory Industry 4.0**")
     
     # Sidebar
     with st.sidebar:
@@ -323,7 +499,7 @@ def main():
         agent_options = {
             "integrated": "Integrated Agent",
             "monitoring": "Monitoring Agent",
-            "retriever": "Documentation Agent",
+            "retriever": "Retriever Agent",
             "analytics": "Analytics Agent"
         }
         
@@ -356,7 +532,7 @@ def main():
             """)
         elif selected_agent == "retriever":
             st.info("""
-            **Documentation Agent**
+            **Retriever Agent**
             - User manuals
             - Setup procedures
             - Technical documentation
@@ -365,11 +541,9 @@ def main():
         elif selected_agent == "analytics":
             st.info("""
             **Analytics Agent**
-            - Data visualization
-            - Performance metrics
-            - Historical trends
-            - Component analysis
-            - Anomaly detection
+            - Time series analysis
+            - Workflow visualization
+            - Process analysis
             """)
             
             # Add dashboard toggle for analytics agent
@@ -378,9 +552,6 @@ def main():
                 value=st.session_state.get('show_dashboard', False),
                 help="Toggle between chat interface and visual dashboard"
             )
-            
-            if not st.session_state.get('show_dashboard', False):
-                st.info("💡 Check 'Show Analytics Dashboard' above to view interactive visualizations!")
             
             # Dashboard Controls (when dashboard is enabled)
             if st.session_state.get('show_dashboard', False):
@@ -494,6 +665,9 @@ def main():
         # Display chat history
         display_chat_history()
         
+        # Progress bar container (will be used when processing queries)
+        progress_container = st.empty()
+        
         # Chat input - positioned after main content area
         placeholder_text = {
             "integrated": "Ask about manufacturing status, procedures, or get help...",
@@ -503,7 +677,8 @@ def main():
         }
         
         if prompt := st.chat_input(placeholder_text.get(st.session_state.current_agent, "How can I help you?")):
-            process_query(prompt)
+            # Pass the progress container to the process_query function
+            process_query(prompt, progress_container)
             st.rerun()
         
         # Example queries section (only show in chat mode)
@@ -519,22 +694,25 @@ def main():
                     "Equipment health check"
                 ],
                 "retriever": [
-                    "How to configure TIA Portal?",
+                    "How to configure IoT gateway?",
                     "Troubleshooting guide",
                     "System architecture overview"
                 ],
                 "analytics": [
-                    "Show VGR performance metrics",
-                    "Analyze factory component activity",
-                    "How are the environmental conditions in the factory?"
+                    "What happened on 2nd December 2022 between 14:00 and 14:30?",
+                    "Analyze production process with data and visual insights",
+                    "Show me the environmental conditions with analysis",
                 ]
             }
             
+            # Show basic examples for current agent
             for example in examples.get(st.session_state.current_agent, []):
                 if st.button(f"💭 {example}", key=f"example_{example}"):
-                    process_query(example)
+                    # Create a progress container for the example query
+                    example_progress = st.empty()
+                    process_query(example, example_progress)
                     st.rerun()
-    
+            
         # System status section (appears after chat input)
         with st.expander("🔌 System Status"):
             try:
@@ -577,23 +755,6 @@ def main():
             except Exception as e:
                 st.error("⚠️ Unable to get system status")
                 st.caption(f"Error: {str(e)}")
-    
-    # Enhanced footer
-    st.markdown("---")
-    
-    # Footer with better styling
-    footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
-    
-    with footer_col2:
-        st.markdown("""
-        <div style='text-align: center; color: #666; padding: 20px;'>
-            <p style='margin: 5px 0; font-size: 14px;'>fischertechnik Training Factory Industry 4.0</p>
-            <p style='margin: 5px 0; font-size: 12px;'>Powered by SINDIT Knowledge Graph & Neo4j Documentation System</p>
-            <div style='margin-top: 10px; font-size: 12px; color: #888;'>
-                Built with Streamlit
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

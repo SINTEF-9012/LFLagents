@@ -207,19 +207,19 @@ class IntegratedManufacturingAgent:
             
         return status
     
-    def get_manufacturing_insights(self) -> str:
-        """
-        Generate comprehensive manufacturing insights.
+    # def get_manufacturing_insights(self) -> str:
+    #     """
+    #     Generate comprehensive manufacturing insights.
         
-        Returns:
-            str: Detailed insights about current manufacturing status
-        """
-        insights_query = """
-            "Provide comprehensive insights about the current manufacturing system including:\n"
-            "1. Current sensor readings and environmental conditions\n"
-            "2. Equipment status and operational efficiency\n"
-            "3. System health and connectivity status\n"
-        """
+    #     Returns:
+    #         str: Detailed insights about current manufacturing status
+    #     """
+    #     insights_query = """
+    #         "Provide comprehensive insights about the current manufacturing system including:\n"
+    #         "1. Current sensor readings and environmental conditions\n"
+    #         "2. Equipment status and operational efficiency\n"
+    #         "3. System health and connectivity status\n"
+    #     """
         
-        return self.query(insights_query)
+    #     return self.query(insights_query)
     

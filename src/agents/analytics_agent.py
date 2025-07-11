@@ -3,48 +3,36 @@ import sys
 import pandas as pd
 import numpy as np
 import re
+import tempfile
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Union
 
-# Add the src directory to the path to import utils
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Also add the root directory to access factory_data
 root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(root_dir)
 
-try:
-    from utils.ts_preprocessing import (
-        load_resampled_requested_components,
-        FACTORY_COMPONENT_CONFIG
-    )
-except ImportError as e:
-    print(f"Warning: Could not import ts_preprocessing: {e}")
-    # Fallback configuration
-    FACTORY_COMPONENT_CONFIG = {
-        'FACTORY': {'description': 'Factory Overview'},
-        'VGR': {'description': 'Vacuum Gripper Robot'},
-        'HBW': {'description': 'High-bay Warehouse'},
-        'MPO': {'description': 'Multi-Processing Station'},
-        'SLD': {'description': 'Sorting Line'},
-        'DPS': {'description': 'Delivery Station'},
-        'SSC': {'description': 'Surveillance Camera'},
-        'ENVIRONMENTAL': {'description': 'Environmental Sensors'}
-    }
-    
-    def load_resampled_requested_components(components, time_range, resample_interval='5S'):
-        """Fallback function when ts_preprocessing is not available"""
-        return {}
+from utils.ts_preprocessing import load_resampled_requested_components, FACTORY_COMPONENT_CONFIG
+from utils.llm_image_explanation import (
+    generate_comprehensive_process_explanation,
+    LLMImageAnalyzer,
+    ChartImageSaver
+)
+
+# Import visualization functions
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from viz import visualize_factory_overview, visualize_component_activity, visualize_environmental_data
 
 class AnalyticsAgent:
     """
-    Analytics Agent for manufacturing data visualization and analysis.
+    Refactored Analytics Agent for manufacturing data visualization and analysis.
     
-    This agent provides data visualization and analytics capabilities by:
+    This agent provides essential data processing capabilities:
     1. Loading and processing historical factory data
-    2. Generating interactive visualizations for different components
-    3. Calculating performance metrics and statistics
-    4. Providing insights based on historical trends
+    2. Generating metrics for dashboard display
+    3. Processing natural language queries with chart generation
+    4. Providing LLM-powered process analysis
     """
     
     def __init__(self):
@@ -53,439 +41,695 @@ class AnalyticsAgent:
         self.available_components = list(self.component_config.keys())
         self.default_time_range = self._get_default_time_range()
         self.loaded_data = {}
-        self.metrics_cache = {}
+        self.charts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'generated_charts')
+        os.makedirs(self.charts_dir, exist_ok=True)
+        
+        # Initialize LLM and Chart utilities
+        self.llm_analyzer = LLMImageAnalyzer()
+        self.chart_saver = ChartImageSaver()
     
     def _get_default_time_range(self) -> Tuple[datetime, datetime]:
         """Get a default time range for data loading."""
-        # Use the actual time range from the factory data (starts 2022-12-01)
-        start_time = datetime(2022, 12, 1, 0, 0, 0)
-        end_time = datetime(2022, 12, 1, 1, 0, 0)  # 1 hour window
-        return (start_time, end_time)
+        # Default to factory data time range (2022-12-02 14:00 to 14:30)
+        start_time = datetime(2022, 12, 2, 14, 0, 0)
+        end_time = datetime(2022, 12, 2, 14, 30, 0)
+        return start_time, end_time
     
     def get_available_components(self) -> List[str]:
-        """Return a list of available factory components for visualization."""
+        """Get list of available components."""
         return self.available_components
     
     def get_component_description(self, component: str) -> str:
-        """Get the description for a specific component."""
+        """Get description for a component."""
         if component in self.component_config:
             return self.component_config[component]['description']
-        return "Component not found"
+        return f"Unknown component: {component}"
     
     def load_component_data(self, components: List[str], time_range: Optional[Tuple[datetime, datetime]] = None,
                            resample_interval: str = '5S') -> Dict[str, pd.DataFrame]:
         """
-        Load data for requested components within the specified time range.
+        Load component data for the specified time range.
         
         Args:
-            components: List of component names to load data for
-            time_range: Tuple of (start_time, end_time) or None to use default
-            resample_interval: Resampling interval for time series data
+            components: List of component names to load
+            time_range: Optional time range tuple (start, end)
+            resample_interval: Resampling interval (default: '5S')
             
         Returns:
-            Dictionary of component names mapped to their dataframes
+            Dictionary with component names as keys and DataFrames as values
         """
         if time_range is None:
             time_range = self.default_time_range
-            
-        # Validate components
-        valid_components = [c for c in components if c in self.available_components]
-        if not valid_components:
-            print(f"No valid components found. Available: {self.available_components}")
-            return {}
-            
-        # Load data using the utility function
+        
         try:
-            print(f"Loading data for components: {valid_components}")
-            print(f"Time range: {time_range}")
-            print(f"Resample interval: {resample_interval}")
-            
-            self.loaded_data = load_resampled_requested_components(
-                valid_components, time_range, resample_interval
+            # Load data for requested components
+            data_dict = load_resampled_requested_components(
+                components, 
+                time_range, 
+                resample_interval
             )
             
-            # Debug output
-            if self.loaded_data:
-                for comp, data in self.loaded_data.items():
-                    if data is not None:
-                        print(f"Loaded {comp}: {data.shape} rows/cols")
-                    else:
-                        print(f"No data for {comp}")
-            else:
-                print("No data loaded at all")
-                
+            # Store loaded data
+            self.loaded_data.update(data_dict)
+            
+            return data_dict
+            
         except Exception as e:
-            print(f"Error loading data: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            self.loaded_data = {}
-        
-        return self.loaded_data
-    
+            print(f"Error loading data: {e}")
+            return {}
+
     def get_component_metrics(self, component: str) -> Dict[str, Any]:
         """
-        Calculate and return key metrics for a component.
+        Get metrics for a specific component.
         
         Args:
-            component: Component name to calculate metrics for
+            component: Component name
             
         Returns:
-            Dictionary of metrics with their values
+            Dictionary containing component metrics
         """
-        if component not in self.loaded_data or self.loaded_data[component] is None:
-            return {"error": f"No data loaded for {component}"}
-            
-        # If metrics are already calculated, return from cache
-        if component in self.metrics_cache:
-            return self.metrics_cache[component]
-            
-        df = self.loaded_data[component]
+        if component not in self.loaded_data:
+            return {"error": f"No data loaded for component {component}"}
+        
+        data = self.loaded_data[component]
+        
+        if data.empty:
+            return {"error": f"No data available for component {component}"}
+        
         metrics = {}
         
-        # Calculate basic metrics based on component type
-        if component == 'FACTORY':
-            # For factory overview, calculate activity metrics across components
-            status_columns = [col for col in df.columns if 'status_code' in col]
-            
-            # Overall activity percentage
-            active_percentages = []
-            for col in status_columns:
-                if col in df.columns:
-                    non_idle = df[df[col] != 1][col].count()
-                    total = df[col].count()
-                    percentage = (non_idle / total * 100) if total > 0 else 0
-                    active_percentages.append(percentage)
+        try:
+            # Calculate metrics based on component type
+            if component == 'ENVIRONMENTAL':
+                # Environmental metrics
+                env_columns = [col for col in data.columns if any(env_type in col.lower() for env_type in 
+                              ['temperature', 'humidity', 'air_quality', 'pressure', 'brightness', 'gas'])]
+                
+                for col in env_columns:
+                    if data[col].notna().any():
+                        metrics[f"{col}_avg"] = round(data[col].mean(), 2)
+                        metrics[f"{col}_min"] = round(data[col].min(), 2)
+                        metrics[f"{col}_max"] = round(data[col].max(), 2)
+                        metrics[f"{col}_std"] = round(data[col].std(), 2)
+                        
+            elif component == 'FACTORY':
+                # Factory overview metrics
+                all_columns = [col for col in data.columns if not col.startswith('factory_')]
+                
+                if all_columns:
+                    # Calculate activity percentages using status codes
+                    activity_data = []
+                    for col in all_columns:
+                        if 'status_code' in col:
+                            col_data = data[col]
+                            # For status codes: != 1 means active
+                            activity_pct = (col_data != 1).mean() * 100
+                            activity_data.append(activity_pct)
                     
-                    component_name = col.replace('_status_code', '').upper()
-                    metrics[f"{component_name}_active_pct"] = round(percentage, 1)
-            
-            # Average activity across all components
-            metrics["avg_activity_pct"] = round(sum(active_percentages) / len(active_percentages), 1) if active_percentages else 0
-            
-            # Calculate total active time (any component active)
-            active_mask = pd.Series(False, index=df.index)
-            for col in status_columns:
-                active_mask = active_mask | (df[col] != 1)
-            
-            active_times = df.loc[active_mask, 'time']
-            if not active_times.empty:
-                active_time = active_times.max() - active_times.min()
-                active_seconds = active_time.total_seconds()
-                metrics["active_time_seconds"] = round(active_seconds, 1)
-                metrics["active_time_minutes"] = round(active_seconds / 60, 1)
+                    if activity_data:
+                        metrics['avg_activity_pct'] = round(sum(activity_data) / len(activity_data), 2)
+                        metrics['active_time_minutes'] = round(len(data) * 5 / 60, 2)  # 5-second intervals
+                
             else:
-                metrics["active_time_seconds"] = 0
-                metrics["active_time_minutes"] = 0
-                
-            # Count target movements for VGR if available
-            if 'vgr_target_status' in df.columns:
-                vgr_targets = df[df['vgr_target_status'].notna()]['vgr_target_status'].unique()
-                metrics["vgr_target_count"] = len(vgr_targets)
-                
-                # Target details
-                target_counts = {}
-                for target in vgr_targets:
-                    target_count = len(df[df['vgr_target_status'] == target])
-                    target_counts[str(target)] = target_count
-                metrics["vgr_target_details"] = target_counts
-                
-        elif component == 'ENVIRONMENTAL':
-            # For environmental data, calculate statistics for each sensor
-            env_mapping = {
-                'factory_air_pressure': ('Air Pressure', 'hPa'),
-                'factory_index_air_quality': ('Air Quality Index', 'index'),
-                'factory_gas_resistance': ('Gas Resistance', 'Ω'),
-                'factory_humidity_raw': ('Humidity', '%'),
-                'factory_temperature_raw': ('Temperature', '°C'),
-            }
-            
-            for col, (name, unit) in env_mapping.items():
-                if col in df.columns:
-                    values = df[col].dropna()
-                    if not values.empty:
-                        metrics[f"{col}_avg"] = round(values.mean(), 2)
-                        metrics[f"{col}_min"] = round(values.min(), 2)
-                        metrics[f"{col}_max"] = round(values.max(), 2)
-                        metrics[f"{col}_unit"] = unit
-                        
-        else:
-            # For other components, focus on status codes and positions
-            # Status analysis
-            status_cols = [col for col in df.columns if 'status_code' in col]
-            for col in status_cols:
-                if col in df.columns:
-                    non_idle = df[df[col] != 1][col].count()
-                    total = df[col].count()
-                    percentage = (non_idle / total * 100) if total > 0 else 0
-                    metrics[f"{col}_active_pct"] = round(percentage, 1)
-            
-            # Position analysis for components with position data
-            position_cols = [col for col in df.columns if any(pos in col for pos in 
-                            ['pos_horizontal', 'pos_vertical', 'pos_rotation', 'position_pan', 'position_tilt'])]
-            
-            for col in position_cols:
-                if col in df.columns:
-                    values = df[col].dropna()
-                    if not values.empty:
-                        metrics[f"{col}_avg"] = round(values.mean(), 2)
-                        metrics[f"{col}_min"] = round(values.min(), 2)
-                        metrics[f"{col}_max"] = round(values.max(), 2)
-                        metrics[f"{col}_range"] = round(values.max() - values.min(), 2)
-        
-        # Cache the calculated metrics
-        self.metrics_cache[component] = metrics
-        return metrics
-    
-    def get_anomaly_insights(self, component: str) -> List[Dict[str, Any]]:
-        """
-        Identify potential anomalies or interesting patterns in the data.
-        
-        Args:
-            component: Component name to analyze
-            
-        Returns:
-            List of anomaly insights with descriptions and timestamps
-        """
-        if component not in self.loaded_data or self.loaded_data[component] is None:
-            return []
-        
-        df = self.loaded_data[component]
-        insights = []
-        
-        # Component-specific anomaly detection
-        if component == 'FACTORY':
-            # Look for concurrent activity across multiple components
-            status_columns = [col for col in df.columns if 'status_code' in col]
-            if len(status_columns) >= 2:
-                concurrent_mask = pd.Series(False, index=df.index)
+                # Component-specific metrics
+                # Status columns - use status codes preferentially
+                status_columns = [col for col in data.columns if 'status_code' in col]
                 for col in status_columns:
-                    concurrent_mask = concurrent_mask | (df[col] != 1)
+                    col_data = data[col]
+                    # For status codes: != 1 means active
+                    active_pct = (col_data != 1).mean() * 100
+                    metrics[f"{col}_active_pct"] = round(active_pct, 2)
                 
-                concurrent_times = df.loc[concurrent_mask, 'time']
-                if not concurrent_times.empty:
-                    insights.append({
-                        "type": "concurrent_activity",
-                        "description": f"Concurrent activity detected across multiple components",
-                        "start_time": concurrent_times.min(),
-                        "end_time": concurrent_times.max(),
-                        "duration_seconds": (concurrent_times.max() - concurrent_times.min()).total_seconds()
-                    })
-        
-        elif component == 'ENVIRONMENTAL':
-            # Check for temperature spikes or drops
-            if 'factory_temperature_raw' in df.columns:
-                temp = df['factory_temperature_raw'].dropna()
-                if not temp.empty:
-                    # Calculate rolling mean and standard deviation
-                    rolling_mean = temp.rolling(window=10, min_periods=1).mean()
-                    rolling_std = temp.rolling(window=10, min_periods=1).std()
-                    
-                    # Find values that deviate significantly
-                    threshold = 2.0  # Standard deviations
-                    anomalies = df[(temp > rolling_mean + threshold * rolling_std) | 
-                                  (temp < rolling_mean - threshold * rolling_std)]
-                    
-                    if not anomalies.empty:
-                        insights.append({
-                            "type": "temperature_anomaly",
-                            "description": f"Temperature anomalies detected",
-                            "count": len(anomalies),
-                            "max_deviation": round(max(abs(temp - rolling_mean)), 2),
-                            "timestamps": anomalies['time'].tolist()
-                        })
-        
-        elif component in ['VGR', 'HBW']:
-            # Check for unusual movement patterns
-            position_cols = [col for col in df.columns if any(pos in col for pos in 
-                            ['pos_horizontal', 'pos_vertical', 'pos_rotation'])]
-            
-            for col in position_cols:
-                if col in df.columns:
-                    values = df[col].dropna()
-                    if len(values) > 10:
-                        # Look for rapid changes (jerky movements)
-                        deltas = values.diff().abs()
-                        mean_delta = deltas.mean()
-                        std_delta = deltas.std()
+                # Position columns
+                position_columns = [col for col in data.columns if any(pos_type in col for pos_type in 
+                                   ['pos_', 'position', 'actual_pos', 'target_pos'])]
+                
+                for col in position_columns:
+                    if data[col].notna().any():
+                        metrics[f"{col}_avg"] = round(data[col].mean(), 2)
+                        metrics[f"{col}_min"] = round(data[col].min(), 2)
+                        metrics[f"{col}_max"] = round(data[col].max(), 2)
+                        metrics[f"{col}_range"] = round(data[col].max() - data[col].min(), 2)
                         
-                        rapid_changes = df[deltas > mean_delta + 2 * std_delta]
-                        if len(rapid_changes) > 0:
-                            insights.append({
-                                "type": "rapid_movement",
-                                "component": component,
-                                "axis": col,
-                                "description": f"Unusually rapid movement detected in {col}",
-                                "count": len(rapid_changes),
-                                "timestamps": rapid_changes['time'].tolist()
-                            })
-        
-        return insights
-    
-    def query(self, query: str) -> str:
+        except Exception as e:
+            metrics['error'] = f"Error calculating metrics: {str(e)}"
+            
+        return metrics
+
+    def generate_data_summary(self, component: str, data: pd.DataFrame, time_range: Tuple[datetime, datetime]) -> str:
         """
-        Process a natural language query about visualization and analytics.
+        Generate a comprehensive data summary for any component.
         
         Args:
-            query: Natural language query about data visualization or analytics
+            component: Component name (ENVIRONMENTAL, FACTORY, VGR, etc.)
+            data: Component data DataFrame
+            time_range: Time range for the analysis
             
         Returns:
-            Response with visualization insights and metrics
+            Formatted string with component data summary
         """
-        # Parse time range from query first
-        parsed_time_range = self._parse_time_range_from_query(query)
-        
-        # Debug output to show what time range is being used
-        if parsed_time_range:
-            print(f"Using parsed time range: {parsed_time_range}")
-        else:
-            print(f"No time range parsed from query, using default: {self.default_time_range}")
-        
-        # Load data for all components with the parsed or default time range
-        self.load_component_data(self.available_components, time_range=parsed_time_range)
-        
-        # Parse query to identify relevant components and metrics
-        components_mentioned = []
-        for component in self.available_components:
-            if component.lower() in query.lower():
-                components_mentioned.append(component)
+        try:
+            start_time, end_time = time_range
+            duration_minutes = (end_time - start_time).total_seconds() / 60
+            
+            base_summary = f"""**{component} Analysis ({start_time.strftime('%H:%M:%S')} to {end_time.strftime('%H:%M:%S')})**
+
+**Time Range Analysis:**
+- Duration: {duration_minutes:.1f} minutes
+- Data Points: {len(data)}
+- Sampling Rate: 5-second intervals
+
+"""
+            
+            if component == 'ENVIRONMENTAL':
+                return base_summary + self._analyze_environmental_metrics(data)
+            elif component == 'FACTORY':
+                return base_summary + self._analyze_factory_metrics(data)
+            else:
+                return base_summary + self._analyze_component_metrics(data)
                 
-        # If no specific components mentioned, include the factory overview
-        if not components_mentioned:
-            components_mentioned = ['FACTORY']
-            
-        # Collect metrics for mentioned components
-        all_metrics = {}
-        insights = []
-        
-        for component in components_mentioned:
-            metrics = self.get_component_metrics(component)
-            all_metrics[component] = metrics
-            
-            # Get insights for this component
-            component_insights = self.get_anomaly_insights(component)
-            insights.extend(component_insights)
-            
-        # Format response based on the metrics and insights
-        time_range_info = ""
-        if parsed_time_range:
-            start_time, end_time = parsed_time_range
-            time_range_info = f"\n**Time Range:** {start_time.strftime('%Y-%m-%d %H:%M:%S')} to {end_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        
-        response = f"## Analytics for {', '.join(components_mentioned)}{time_range_info}\n"
-        
-        for component in components_mentioned:
-            response += f"### {component} - {self.get_component_description(component)}\n\n"
-            
-            if component in all_metrics:
-                metrics = all_metrics[component]
-                
-                if component == 'FACTORY':
-                    response += f"**Overall Factory Metrics:**\n"
-                    response += f"- Average Activity: {metrics.get('avg_activity_pct', 0)}%\n"
-                    response += f"- Active Time: {metrics.get('active_time_minutes', 0)} minutes\n\n"
-                    
-                    response += "**Component Activity:**\n"
-                    for key, value in metrics.items():
-                        if key.endswith('_active_pct') and not key.startswith('avg'):
-                            component_name = key.replace('_active_pct', '')
-                            response += f"- {component_name}: {value}% active\n"
-                    
-                elif component == 'ENVIRONMENTAL':
-                    response += "**Environmental Conditions:**\n"
-                    
-                    # Temperature
-                    if 'factory_temperature_raw_avg' in metrics:
-                        response += (f"- Temperature: {metrics['factory_temperature_raw_avg']}°C "
-                                   f"(Range: {metrics['factory_temperature_raw_min']}°C - {metrics['factory_temperature_raw_max']}°C)\n")
-                    
-                    # Humidity
-                    if 'factory_humidity_raw_avg' in metrics:
-                        response += (f"- Humidity: {metrics['factory_humidity_raw_avg']}% "
-                                   f"(Range: {metrics['factory_humidity_raw_min']}% - {metrics['factory_humidity_raw_max']}%)\n")
-                    
-                    # Air Quality
-                    if 'factory_index_air_quality_avg' in metrics:
-                        response += (f"- Air Quality Index: {metrics['factory_index_air_quality_avg']} "
-                                   f"(Range: {metrics['factory_index_air_quality_min']} - {metrics['factory_index_air_quality_max']})\n")
-                    
-                    # Air Pressure
-                    if 'factory_air_pressure_avg' in metrics:
-                        response += (f"- Air Pressure: {metrics['factory_air_pressure_avg']} hPa "
-                                   f"(Range: {metrics['factory_air_pressure_min']} - {metrics['factory_air_pressure_max']} hPa)\n")
-                
-                else:
-                    # For other components, show status and position data
-                    status_metrics = {k: v for k, v in metrics.items() if 'active_pct' in k}
-                    position_metrics = {k: v for k, v in metrics.items() if any(x in k for x in ['_avg', '_min', '_max', '_range'])}
-                    
-                    if status_metrics:
-                        response += "**Activity Status:**\n"
-                        for key, value in status_metrics.items():
-                            status_name = key.replace('_active_pct', '').replace('_', ' ').title()
-                            response += f"- {status_name}: {value}% active\n"
-                    
-                    if position_metrics:
-                        response += "\n**Position Data:**\n"
-                        # Group metrics by position type
-                        pos_groups = {}
-                        for key, value in position_metrics.items():
-                            base_name = '_'.join(key.split('_')[:-1])  # Remove _avg, _min, etc.
-                            metric_type = key.split('_')[-1]  # avg, min, max, range
-                            
-                            if base_name not in pos_groups:
-                                pos_groups[base_name] = {}
-                            pos_groups[base_name][metric_type] = value
-                        
-                        # Format each position metric
-                        for base_name, values in pos_groups.items():
-                            if 'avg' in values:
-                                display_name = base_name.replace('_', ' ').title()
-                                response += f"- {display_name}: {values.get('avg')} "
-                                
-                                if 'min' in values and 'max' in values:
-                                    response += f"(Range: {values.get('min')} - {values.get('max')})"
-                                
-                                response += "\n"
-            
-            # Add insights
-            component_insights = [insight for insight in insights if insight.get('component', component) == component]
-            if component_insights:
-                response += "\n**Insights & Anomalies:**\n"
-                for insight in component_insights:
-                    response += f"- {insight['description']}\n"
-                    if 'count' in insight:
-                        response += f"  - Occurrences: {insight['count']}\n"
-                    if 'duration_seconds' in insight:
-                        response += f"  - Duration: {insight['duration_seconds']} seconds\n"
-            
-            response += "\n"
-            
-        return response
+        except Exception as e:
+            return f"Error generating {component} summary: {str(e)}"
     
-    def get_visualization_urls(self, component: str) -> Dict[str, str]:
-        """
-        Get URLs for visualizations that can be embedded in the UI.
+    def _analyze_environmental_metrics(self, data: pd.DataFrame) -> str:
+        """Analyze environmental data metrics."""
+        metrics_text = "**Environmental Metrics:**"
+        env_columns = [col for col in data.columns if any(env_type in col.lower() for env_type in 
+                      ['temperature', 'humidity', 'air_quality', 'pressure', 'brightness', 'gas'])]
         
-        In a real implementation, this might generate URLs to visualization endpoints
-        or return configuration for embedded visualizations.
+        for col in env_columns:
+            if data[col].notna().any():
+                avg_val = data[col].mean()
+                min_val = data[col].min()
+                max_val = data[col].max()
+                std_val = data[col].std()
+                metric_name = col.replace('factory_', '').replace('_', ' ').title()
+                metrics_text += f"\n- {metric_name}: Avg {avg_val:.2f}, Range {min_val:.2f}-{max_val:.2f}, Std {std_val:.2f}"
+        
+        return metrics_text
+    
+    def _analyze_factory_metrics(self, data: pd.DataFrame) -> str:
+        """Analyze factory overview metrics with cycle analysis."""
+        metrics_text = "**Component Activity Analysis:**"
+        
+        # Component activity analysis
+        component_activity = {}
+        for col in data.columns:
+            if 'status_code' in col:
+                component_name = col.split('_')[0].upper()
+                if component_name not in component_activity:
+                    activity_pct = (data[col] != 1).mean() * 100
+                    component_activity[component_name] = activity_pct
+        
+        for comp, pct in component_activity.items():
+            metrics_text += f"\n- {comp}: {pct:.1f}% active time"
+        
+        # Position movement analysis
+        metrics_text += "\n\n**Position Movement Analysis:**"
+        position_movements = {}
+        for col in data.columns:
+            if any(pos_type in col for pos_type in ['actual_pos', 'target_pos']):
+                component_name = col.split('_')[0].upper()
+                if component_name not in position_movements:
+                    position_movements[component_name] = {
+                        'min_pos': data[col].min(),
+                        'max_pos': data[col].max(),
+                        'movement_range': data[col].max() - data[col].min()
+                    }
+        
+        for comp, pos_data in position_movements.items():
+            metrics_text += f"\n- {comp}: Range {pos_data['min_pos']:.0f}-{pos_data['max_pos']:.0f}, Movement: {pos_data['movement_range']:.0f}"
+        
+        # Process cycle analysis
+        cycle_analysis = self._analyze_process_cycles(data)
+        metrics_text += f"\n\n**Process Cycle Analysis:**"
+        metrics_text += f"\n- Detected Process Cycles: {cycle_analysis['cycle_count']}"
+        metrics_text += f"\n- Average Cycle Duration: {cycle_analysis['avg_cycle_duration']:.1f} minutes"
+        metrics_text += f"\n- Overall Process Type: {cycle_analysis['cycle_type']}"
+        
+        if cycle_analysis['cycle_details']:
+            metrics_text += "\n\n**Individual Cycle Details:**"
+            for cycle in cycle_analysis['cycle_details']:
+                metrics_text += f"\n- Cycle {cycle['cycle_number']}: ({cycle['duration_minutes']}min) - {cycle['process_type']}"
+                if cycle['active_components']:
+                    metrics_text += f" [Components: {', '.join(cycle['active_components'])}]"
+        
+        return metrics_text
+    
+    def _analyze_component_metrics(self, data: pd.DataFrame) -> str:
+        """Analyze individual component metrics."""
+        metrics_text = "**Component Activity:**"
+        
+        # Status code analysis
+        status_columns = [col for col in data.columns if 'status_code' in col]
+        for col in status_columns:
+            if data[col].notna().any():
+                activity_pct = (data[col] != 1).mean() * 100
+                metrics_text += f"\n- {col.replace('_', ' ').title()}: {activity_pct:.1f}% active time"
+        
+        # Position analysis
+        position_columns = [col for col in data.columns if any(pos_type in col for pos_type in 
+                           ['pos_', 'position', 'actual_pos', 'target_pos'])]
+        
+        if position_columns:
+            metrics_text += "\n\n**Position Analysis:**"
+            for col in position_columns:
+                if data[col].notna().any():
+                    avg_pos = data[col].mean()
+                    min_pos = data[col].min()
+                    max_pos = data[col].max()
+                    movement_range = max_pos - min_pos
+                    pos_name = col.replace('_', ' ').title()
+                    metrics_text += f"\n- {pos_name}: Avg {avg_pos:.0f}, Range {min_pos:.0f}-{max_pos:.0f}, Movement {movement_range:.0f}"
+        
+        return metrics_text
+
+    def _analyze_process_cycles(self, factory_data: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Enhanced cycle detection considering multiple components and their coordination.
+        Now includes per-cycle process type identification.
         
         Args:
-            component: Component name to visualize
+            factory_data: Factory data DataFrame
             
         Returns:
-            Dictionary of visualization names mapped to their URLs/configs
+            Dictionary with cycle analysis results including per-cycle types
         """
-        # This is a placeholder that would be replaced with actual visualization URLs
-        # In a real implementation, these might point to Streamlit components or external dashboards
-        visualizations = {
-            "activity_chart": f"/visualize?component={component}&chart=activity",
-            "metrics_dashboard": f"/visualize?component={component}&chart=metrics",
-            "anomaly_detection": f"/visualize?component={component}&chart=anomalies"
+        cycle_analysis = {
+            'cycle_count': 0,
+            'avg_cycle_duration': 0,
+            'cycle_type': 'Unknown',
+            'cycle_details': []  # New: detailed info for each cycle
         }
         
-        return visualizations
+        try:
+            # Enhanced cycle detection: consider multiple components working together
+            # Key components in the manufacturing process
+            component_columns = {
+                'vgr': 'vgr_status_code',
+                'hbw': 'hbw_status_code', 
+                'mpo': 'mpo_status_code',
+                'sld': 'sld_status_code'
+            }
+            
+            # Find available components
+            available_components = {}
+            for comp_name, col_name in component_columns.items():
+                if col_name in factory_data.columns:
+                    available_components[comp_name] = col_name
+            
+            if not available_components:
+                return cycle_analysis
+            
+            # Create a combined activity signal considering all components
+            # Any component active (status != 1) means the process is active
+            combined_activity = pd.Series(False, index=factory_data.index)
+            
+            for comp_name, col_name in available_components.items():
+                component_active = factory_data[col_name] != 1
+                combined_activity = combined_activity | component_active
+            
+            # Find process start transitions with more flexible logic
+            # Option 1: Find transitions from idle to active
+            process_start_mask = (combined_activity.shift(1) == False) & (combined_activity == True)
+            
+            # CRITICAL FIX: Extract proper timestamps from the dataframe index
+            # Instead of using list() which can return positions, directly access the timestamps
+            process_start_indices = []
+            for i, is_start in enumerate(process_start_mask):
+                if is_start:
+                    process_start_indices.append(factory_data.index[i])
+            
+            # If no transitions found, try alternative approach: 
+            # Find continuous active periods and treat each as a cycle
+            if len(process_start_indices) == 0 and combined_activity.sum() > 0:
+                # Find all active periods
+                active_periods = []
+                in_active_period = False
+                period_start = None
+                
+                for i, is_active in enumerate(combined_activity):
+                    if is_active and not in_active_period:
+                        # Start of new active period - use timestamp
+                        period_start = factory_data.index[i]
+                        in_active_period = True
+                    elif not is_active and in_active_period:
+                        # End of active period
+                        period_end = factory_data.index[i-1] if i > 0 else factory_data.index[i]
+                        active_periods.append((period_start, period_end))
+                        in_active_period = False
+                
+                # Handle case where data ends while still active
+                if in_active_period and period_start is not None:
+                    active_periods.append((period_start, factory_data.index[-1]))
+                
+                # Use active periods as cycles - use timestamps, not indices
+                if active_periods:
+                    process_start_indices = [start for start, end in active_periods]
+            
+            # Verify all process start indices are timestamps
+            if process_start_indices:
+                # Additional validation - ensure all indices are timestamps
+                for idx in process_start_indices:
+                    if not isinstance(idx, (pd.Timestamp, datetime)):
+                        # This should not happen now, but if it does, we'll convert
+                        if isinstance(idx, (int, np.integer)):
+                            # This is a fallback - should not be needed
+                            converted_idx = factory_data.index[idx]
+            
+            if len(process_start_indices) == 0:
+                cycle_analysis['cycle_count'] = 0
+            else:
+                # Filter transitions that are too close together (< 1 minute)
+                # Since we have 5-second intervals, minimum cycle duration should be 1 minute
+                # 60 seconds / 5 seconds per interval = 12 intervals minimum
+                
+                filtered_transitions = []
+                min_cycle_duration_intervals = 12  # 60 seconds / 5 seconds per interval (1 minute minimum)
+                
+                if process_start_indices:
+                    # Always keep the first transition
+                    filtered_transitions.append(process_start_indices[0])
+                    
+                    # Check subsequent transitions
+                    for i in range(1, len(process_start_indices)):
+                        current_idx = process_start_indices[i]
+                        last_kept_idx = filtered_transitions[-1]
+                        
+                        # Calculate time difference in intervals
+                        # Find the position of current and last indices in the dataframe
+                        current_pos = factory_data.index.get_loc(current_idx)
+                        last_pos = factory_data.index.get_loc(last_kept_idx)
+                        time_diff_intervals = current_pos - last_pos
+                        
+                        # Only keep this transition if it's far enough from the last one
+                        if time_diff_intervals >= min_cycle_duration_intervals:
+                            filtered_transitions.append(current_idx)
+                
+                # ENSURE ALL FILTERED TRANSITIONS ARE TIMESTAMPS
+                validated_filtered_transitions = []
+                for idx in filtered_transitions:
+                    if isinstance(idx, (int, np.integer)):
+                        validated_filtered_transitions.append(factory_data.index[idx])
+                    else:
+                        validated_filtered_transitions.append(idx)
+                filtered_transitions = validated_filtered_transitions
+                
+                cycle_analysis['cycle_count'] = len(filtered_transitions)
+                
+                # Analyze each individual cycle
+                cycle_details = []
+                for i, cycle_start in enumerate(filtered_transitions):
+                    cycle_num = i + 1
+                    
+                    # Determine cycle end (next cycle start or end of data)
+                    if i + 1 < len(filtered_transitions):
+                        next_cycle_start = filtered_transitions[i + 1]
+                        try:
+                            next_pos = factory_data.index.get_loc(next_cycle_start)
+                            if next_pos > 0:
+                                cycle_end = factory_data.index[next_pos - 1]
+                            else:
+                                cycle_end = next_cycle_start
+                        except KeyError:
+                            cycle_end = factory_data.index[-1]
+                    else:
+                        cycle_end = factory_data.index[-1]
+                    
+                    # Extract data for this specific cycle
+                    cycle_data = factory_data.loc[cycle_start:cycle_end]
+                    
+                    # Calculate cycle duration
+                    cycle_duration_minutes = len(cycle_data) * 5 / 60  # 5-second intervals
+                    
+                    # Determine process type for this cycle
+                    cycle_type = self._determine_cycle_type(cycle_data, available_components)
+                    
+                    cycle_info = {
+                        'cycle_number': cycle_num,
+                        'duration_minutes': round(cycle_duration_minutes, 1),
+                        'process_type': cycle_type,
+                        'active_components': self._get_active_components_for_cycle(cycle_data, available_components)
+                    }
+                    
+                    cycle_details.append(cycle_info)
+                
+                cycle_analysis['cycle_details'] = cycle_details
+                
+                # Calculate average cycle duration if cycles detected
+                if len(filtered_transitions) > 1:
+                    # Calculate duration based on filtered transitions
+                    total_duration_minutes = len(factory_data) * 5 / 60  # 5-second intervals
+                    cycle_analysis['avg_cycle_duration'] = round(total_duration_minutes / len(filtered_transitions), 1)
+                elif len(filtered_transitions) == 1:
+                    # Single cycle - use total duration
+                    total_duration_minutes = len(factory_data) * 5 / 60
+                    cycle_analysis['avg_cycle_duration'] = round(total_duration_minutes, 1)
+                
+                # Determine overall process type based on which components are active across all cycles
+                if cycle_analysis['cycle_count'] > 0:
+                    hbw_active = 'hbw' in available_components and (factory_data[available_components['hbw']] != 1).any()
+                    mpo_active = 'mpo' in available_components and (factory_data[available_components['mpo']] != 1).any()
+                    sld_active = 'sld' in available_components and (factory_data[available_components['sld']] != 1).any()
+                    vgr_active = 'vgr' in available_components and (factory_data[available_components['vgr']] != 1).any()
+                    
+                    if mpo_active or sld_active:
+                        cycle_analysis['cycle_type'] = 'Production Process'
+                    elif hbw_active and vgr_active:
+                        cycle_analysis['cycle_type'] = 'Storage Process'
+                    elif vgr_active:
+                        cycle_analysis['cycle_type'] = 'Transfer/Movement Process'
+                    else:
+                        cycle_analysis['cycle_type'] = 'Mixed/Unknown Process'
+            
+            return cycle_analysis
+            
+        except Exception as e:
+            cycle_analysis['cycle_count'] = 0
+            return cycle_analysis
+
+    def _determine_cycle_type(self, cycle_data: pd.DataFrame, available_components: Dict[str, str]) -> str:
+        """
+        Determine the process type for a specific cycle based on active components.
+        
+        Args:
+            cycle_data: DataFrame containing data for a specific cycle
+            available_components: Dictionary of available component columns
+            
+        Returns:
+            String describing the process type for this cycle
+        """
+        try:
+            # Check which components are active during this cycle
+            hbw_active = 'hbw' in available_components and (cycle_data[available_components['hbw']] != 1).any()
+            mpo_active = 'mpo' in available_components and (cycle_data[available_components['mpo']] != 1).any()
+            sld_active = 'sld' in available_components and (cycle_data[available_components['sld']] != 1).any()
+            vgr_active = 'vgr' in available_components and (cycle_data[available_components['vgr']] != 1).any()
+            
+            # Determine process type based on active components
+            if mpo_active or sld_active:
+                return 'Production Process'
+            elif hbw_active and vgr_active:
+                return 'Storage Process'
+            elif vgr_active:
+                return 'Transfer/Movement Process'
+            else:
+                return 'Unknown Process'
+                
+        except Exception as e:
+            return 'Unknown Process'
+
+    def _get_active_components_for_cycle(self, cycle_data: pd.DataFrame, available_components: Dict[str, str]) -> List[str]:
+        """
+        Get list of active components for a specific cycle.
+        
+        Args:
+            cycle_data: DataFrame containing data for a specific cycle
+            available_components: Dictionary of available component columns
+            
+        Returns:
+            List of active component names
+        """
+        try:
+            active_components = []
+            
+            for comp_name, col_name in available_components.items():
+                if (cycle_data[col_name] != 1).any():
+                    active_components.append(comp_name.upper())
+            
+            return active_components
+            
+        except Exception as e:
+            return []
+
+    def analyze_cycles(self, time_range_or_start: Optional[Union[Tuple[datetime, datetime], datetime]] = None, 
+                       end_time: Optional[datetime] = None) -> Dict[str, Any]:
+        """
+        Public method to analyze manufacturing cycles in the factory data for a given time range.
+        If no time range is provided, uses the default time range.
+        
+        Args:
+            time_range_or_start: Either a tuple (start_time, end_time) or just the start_time
+            end_time: If time_range_or_start is a start time, this must be the end time
+        Returns:
+            Dictionary with cycle analysis results including per-cycle types
+        """
+        # Handle both calling conventions:
+        # 1. analyze_cycles((start, end))
+        # 2. analyze_cycles(start, end)
+        if end_time is not None and isinstance(time_range_or_start, datetime):
+            # Called as analyze_cycles(start, end)
+            time_range = (time_range_or_start, end_time)
+        else:
+            # Called as analyze_cycles(time_range)
+            time_range = time_range_or_start
+            
+        if time_range is None:
+            time_range = self.default_time_range
+            
+        # Load factory data for the given time range if not already loaded
+        if 'FACTORY' not in self.loaded_data or self.loaded_data['FACTORY'].empty:
+            self.load_component_data(['FACTORY'], time_range)
+        factory_data = self.loaded_data.get('FACTORY', None)
+        if factory_data is None or factory_data.empty:
+            return {'error': 'No factory data available for cycle analysis'}
+        return self._analyze_process_cycles(factory_data)
+
+    def generate_process_data_summary(self, time_range: Optional[Tuple[datetime, datetime]] = None) -> str:
+        """Generate process data summary - wrapper for backwards compatibility."""
+        if time_range is None:
+            time_range = self.default_time_range
+        
+        if 'FACTORY' not in self.loaded_data:
+            self.load_component_data(['FACTORY'], time_range)
+        
+        factory_data = self.loaded_data.get('FACTORY')
+        if factory_data is None or factory_data.empty:
+            return "No factory data available for analysis"
+        
+        return self.generate_data_summary('FACTORY', factory_data, time_range)
     
-    def _parse_time_range_from_query(self, query: str) -> Optional[Tuple[datetime, datetime]]:
+
+    
+    def query(self, query_text: str, time_range: Optional[Tuple[datetime, datetime]] = None) -> Dict[str, Any]:
+        """
+        Process a natural language query about the factory data.
+        
+        Args:
+            query_text: The user's natural language query
+            time_range: Optional time range for the query
+            
+        Returns:
+            Dictionary containing query results with charts and analysis
+        """
+        try:
+            # Parse time range from query if not provided
+            if time_range is None:
+                time_range = self._parse_time_range_from_query(query_text)
+            
+            # Detect query type and components
+            query_type = self._classify_query_type(query_text)
+            components_to_load = self._detect_components_from_query(query_text)
+            
+            # Load the appropriate data
+            self.load_component_data(components_to_load, time_range)
+            
+            # Get the primary data for analysis
+            primary_component = components_to_load[0]
+            primary_data = self.loaded_data.get(primary_component)
+            
+            if primary_data is None or primary_data.empty:
+                return {
+                    'error': f'No {primary_component.lower()} data available for the specified time range',
+                    'query': query_text,
+                    'time_range': time_range,
+                    'success': False
+                }
+            
+            # Generate data summary
+            data_summary = self.generate_data_summary(primary_component, primary_data, time_range)
+            
+            # Generate chart path for LLM analysis (process analysis only)
+            chart_path = None
+            if query_type == 'process_analysis':
+                chart_path = self._save_chart_for_llm(primary_component, primary_data)
+            
+            # Generate response based on query type
+            if query_type == 'environmental':
+                return {
+                    'query': query_text,
+                    'time_range': time_range,
+                    'primary_component': primary_component,
+                    'data_summary': data_summary,
+                    'chart_path': chart_path,
+                    'query_type': 'environmental',
+                    'llm_analysis': data_summary,  # For environmental, just return data summary
+                    'success': True
+                }
+            else:  # process_analysis
+                # Generate LLM analysis for process queries
+                llm_analysis = self._generate_llm_analysis(chart_path, data_summary, query_text, primary_component)
+                
+                return {
+                    'query': query_text,
+                    'time_range': time_range,
+                    'primary_component': primary_component,
+                    'data_summary': data_summary,
+                    'chart_path': chart_path,
+                    'query_type': 'process_analysis',
+                    'llm_analysis': llm_analysis,
+                    'success': True
+                }
+            
+        except Exception as e:
+            return {
+                'error': f'Error processing query: {str(e)}',
+                'query': query_text,
+                'time_range': time_range,
+                'success': False
+            }
+    
+    def _classify_query_type(self, query_text: str) -> str:
+        """Classify query as environmental or process analysis."""
+        query_lower = query_text.lower()
+        
+        # Environmental queries take priority
+        if any(phrase in query_lower for phrase in [
+            'environment', 'environmental', 'temperature', 'humidity', 'air', 
+            'pressure', 'gas', 'quality', 'sensor', 'condition'
+        ]):
+            return 'environmental'
+        
+        return 'process_analysis'
+    
+    def _save_chart_for_llm(self, component: str, data: pd.DataFrame) -> Optional[str]:
+        """Save chart to file for LLM analysis."""
+        try:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            chart_path = os.path.join(self.charts_dir, f'{component.lower()}_{timestamp}.png')
+            
+            fig = self._create_chart_by_component(component, data)
+            if fig is not None:
+                success = self.chart_saver.save_chart(fig, chart_path)
+                return chart_path if success else None
+            return None
+        except Exception as e:
+            print(f"Error saving chart for LLM: {e}")
+            return None
+    
+    def _generate_llm_analysis(self, chart_path: Optional[str], data_summary: str, 
+                              query_text: str, primary_component: str) -> str:
+        """Generate LLM analysis for process queries."""
+        if chart_path and os.path.exists(chart_path):
+            return generate_comprehensive_process_explanation(
+                chart_path, 
+                data_summary,
+                f"User query: {query_text}\n\nPlease provide a comprehensive analysis addressing the user's specific question about the {primary_component.lower()} data."
+            )
+        else:
+            return f"Based on the query '{query_text}', here's the {primary_component.lower()} analysis:\n\n{data_summary}"
+    
+    def _parse_time_range_from_query(self, query: str) -> Tuple[datetime, datetime]:
         """
         Parse date and time information from a natural language query.
         
@@ -499,10 +743,10 @@ class AnalyticsAgent:
             query: Natural language query that may contain date/time information
             
         Returns:
-            Tuple of (start_time, end_time) if found, None otherwise
+            Tuple of (start_time, end_time) if found, default time range otherwise
         """
         query_lower = query.lower()
-        
+
         # Handle relative time expressions first (e.g., "last 10 minutes", "past hour")
         relative_patterns = [
             # "last X minutes/hours/days"
@@ -518,16 +762,16 @@ class AnalyticsAgent:
             (r'(\d+)\s+hours?\s+ago', 'hours'),
             (r'(\d+)\s+days?\s+ago', 'days'),
         ]
-        
+
         for pattern, unit in relative_patterns:
             match = re.search(pattern, query_lower)
             if match:
                 amount = int(match.group(1))
-                
+
                 # Use current time as reference for relative queries
                 # This allows for future integration with real-time databases
                 now = datetime.now()
-                
+
                 if unit == 'minutes':
                     start_time = now - timedelta(minutes=amount)
                     end_time = now
@@ -537,9 +781,9 @@ class AnalyticsAgent:
                 elif unit == 'days':
                     start_time = now - timedelta(days=amount)
                     end_time = now
-                    
+
                 return (start_time, end_time)
-        
+
         # Common date patterns
         date_patterns = [
             # DD/MM/YYYY or D/M/YYYY formats
@@ -551,7 +795,7 @@ class AnalyticsAgent:
             # Handle ordinal dates like "2nd december 2022"
             r'(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)\s+(\d{4})',
         ]
-        
+
         # Try to find date
         date_match = None
         date_format = None
@@ -561,19 +805,19 @@ class AnalyticsAgent:
                 date_match = match
                 date_format = i
                 break
-        
+
         if not date_match:
-            # If no specific date found, return None to use default
-            return None
-            
+            # If no specific date found, return default
+            return self.default_time_range
+
         # Parse the date based on the pattern matched
         groups = date_match.groups()
-        
+
         if date_format == 3:  # Ordinal date format (e.g., "2nd december 2022")
             day = int(groups[0])
             month_name = groups[1].lower()
             year = int(groups[2])
-            
+
             # Convert month name to number
             month_names = {
                 'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
@@ -583,7 +827,7 @@ class AnalyticsAgent:
             }
             month = month_names.get(month_name)
             if not month:
-                return None
+                return self.default_time_range
         elif len(groups) == 3:
             # Check if it's DD/MM/YYYY or YYYY-MM-DD format
             if len(groups[0]) == 4:  # YYYY-MM-DD
@@ -591,30 +835,30 @@ class AnalyticsAgent:
             else:  # DD/MM/YYYY or DD-MM-YYYY
                 day, month, year = int(groups[0]), int(groups[1]), int(groups[2])
         else:
-            return None
-            
+            return self.default_time_range
+
         try:
             base_date = datetime(year, month, day)
         except ValueError:
             # Invalid date
-            return None
-        
+            return self.default_time_range
+
         # Look for time ranges
         start_time = None
         end_time = None
-        
+
         # Pattern for "from HH:MM to HH:MM" or "from HHpm to HH:MMpm"
         time_range_patterns = [
             r'from\s+(\d{1,2}):(\d{2})\s+to\s+(\d{1,2}):(\d{2})',
             r'from\s+(\d{1,2})(?::(\d{2}))?\s*pm\s+to\s+(\d{1,2}):(\d{2})\s*pm',
             r'from\s+(\d{1,2})\s*pm\s+to\s+(\d{1,2}):(\d{2})\s*pm',
         ]
-        
+
         for pattern in time_range_patterns:
             time_range_match = re.search(pattern, query_lower)
             if time_range_match:
                 groups = time_range_match.groups()
-                
+
                 if pattern.endswith('pm'):
                     # Handle PM times
                     if len(groups) == 4 and groups[1] is not None:  # HH:MM pm to HH:MM pm
@@ -638,11 +882,11 @@ class AnalyticsAgent:
                         start_hour, start_min, end_hour, end_min = map(int, groups)
                     else:
                         continue  # Skip this pattern if groups don't match expected format
-                
+
                 start_time = base_date.replace(hour=start_hour, minute=start_min, second=0)
                 end_time = base_date.replace(hour=end_hour, minute=end_min, second=0)
                 break
-        
+
         if not start_time:
             # Pattern for "at HH:MM" - use 30 minute window
             at_time_match = re.search(r'at\s+(\d{1,2}):(\d{2})', query_lower)
@@ -656,7 +900,7 @@ class AnalyticsAgent:
                 for match in re.finditer(r'(\d{1,2}):(\d{2})', query):
                     hour, minute = int(match.group(1)), int(match.group(2))
                     times_found.append(base_date.replace(hour=hour, minute=minute, second=0))
-                
+
                 if len(times_found) >= 2:
                     start_time = min(times_found)
                     end_time = max(times_found)
@@ -668,8 +912,87 @@ class AnalyticsAgent:
                     # No specific time found, use the whole day
                     start_time = base_date
                     end_time = base_date + timedelta(days=1)
-        
+
         if start_time and end_time:
             return (start_time, end_time)
+
+        return self.default_time_range
+    
+    def _detect_components_from_query(self, query_text: str) -> List[str]:
+        """
+        Detect what components to load based on the query content.
         
-        return None
+        Args:
+            query_text: The user's natural language query
+            
+        Returns:
+            List of component names to load, ordered by priority
+        """
+        query_lower = query_text.lower()
+        components_to_load = []
+        
+        # Environmental keywords
+        if any(keyword in query_lower for keyword in ['environmental', 'environment', 'temperature', 'humidity', 'air quality', 'pressure', 'gas', 'brightness']):
+            components_to_load.append('ENVIRONMENTAL')
+        
+        # Specific component keywords
+        if any(keyword in query_lower for keyword in ['vgr', 'vacuum gripper', 'gripper']):
+            components_to_load.append('VGR')
+        elif any(keyword in query_lower for keyword in ['hbw', 'high bay warehouse', 'warehouse', 'storage']):
+            components_to_load.append('HBW')
+        elif any(keyword in query_lower for keyword in ['mpo', 'multi processing', 'processing']):
+            components_to_load.append('MPO')
+        elif any(keyword in query_lower for keyword in ['sld', 'sorting line', 'sorting']):
+            components_to_load.append('SLD')
+        
+        # Default to factory overview if no specific component mentioned
+        if not components_to_load:
+            components_to_load.append('FACTORY')
+        
+        return components_to_load
+    
+
+    
+    def get_interactive_chart(self, query_text: str, time_range: Optional[Tuple[datetime, datetime]] = None):
+        """
+        Generate interactive chart based on query.
+        
+        Args:
+            query_text: The user's natural language query
+            time_range: Optional time range for the query
+            
+        Returns:
+            Plotly figure object or None if generation fails
+        """
+        try:
+            if time_range is None:
+                time_range = self.default_time_range
+            
+            # Detect and load components
+            components_to_load = self._detect_components_from_query(query_text)
+            self.load_component_data(components_to_load, time_range)
+            
+            # Get primary component and data
+            primary_component = components_to_load[0]
+            primary_data = self.loaded_data.get(primary_component)
+            
+            if primary_data is None or primary_data.empty:
+                return None
+            
+            # Generate appropriate chart
+            return self._create_chart_by_component(primary_component, primary_data)
+                
+        except Exception as e:
+            print(f"Error generating interactive chart: {e}")
+            return None
+    
+    def _create_chart_by_component(self, component: str, data: pd.DataFrame):
+        """Create chart based on component type."""
+        if component == 'ENVIRONMENTAL':
+            return visualize_environmental_data(data)
+        elif component == 'FACTORY':
+            return visualize_factory_overview(data, '5S')
+        else:
+            return visualize_component_activity(data, component, '5S')
+        
+

@@ -66,21 +66,17 @@ FACTORY_COMPONENT_CONFIG = {
 
 def load_and_filter_data(file_path, time_range):
     """Load CSV data and filter by time range"""
-    try:
-        df = pd.read_csv(file_path)
-        # Convert time column
-        if 'time' in df.columns:
-            df['time'] = pd.to_datetime(df['time'], format='mixed', utc=True)
-            # Convert time_range to timezone-aware if needed
-            start_time = pd.to_datetime(time_range[0]).tz_localize('UTC') if pd.to_datetime(time_range[0]).tz is None else pd.to_datetime(time_range[0])
-            end_time = pd.to_datetime(time_range[1]).tz_localize('UTC') if pd.to_datetime(time_range[1]).tz is None else pd.to_datetime(time_range[1])
-            # Filter by time range
-            df = df[(df['time'] >= start_time) & (df['time'] <= end_time)]
-        
-        return df
-    except Exception as e:
-        print(f"Error loading {file_path}: {str(e)}")
-        return None
+    df = pd.read_csv(file_path)
+    # Convert time column
+    if 'time' in df.columns:
+        df['time'] = pd.to_datetime(df['time'], format='mixed', utc=True)
+        # Convert time_range to timezone-aware if needed
+        start_time = pd.to_datetime(time_range[0]).tz_localize('UTC') if pd.to_datetime(time_range[0]).tz is None else pd.to_datetime(time_range[0])
+        end_time = pd.to_datetime(time_range[1]).tz_localize('UTC') if pd.to_datetime(time_range[1]).tz is None else pd.to_datetime(time_range[1])
+        # Filter by time range
+        df = df[(df['time'] >= start_time) & (df['time'] <= end_time)]
+    
+    return df
     
 def load_requested_component_data(component, time_range):
     """Load data for requested factory components"""
