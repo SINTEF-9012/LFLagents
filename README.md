@@ -1,5 +1,14 @@
 # LFLagents
-Learning Feedback Loop agent-based approach
+Learning Feedback Loop agent-based approach is a multi-agent framework to assist users in retrieving information and monitoring the factory status. Three main components of the framework are being constructed: 
+
+•	Generative AI and LLMs-based Analysis Module: Collect real-time and historical data from the Sensors and IoT Devices in the manufacturing process as well as gather insights and observations from operators through visual interfaces and plain language inputs (using GUIs). Analyzing trends and processing real-time and historical data to help guide decisions.
+
+•	Interactive Dashboards and GUIs: Give operators user-friendly graphical interfaces so they can see trends and statistical analysis. Offer operators the ability to interact with data, investigate various scenarios, and provide feedback.
+
+•	Recommendation Module: (Real-time) manufacturing process reconfiguration suggestions may be made by using AI agents to automatically produce feedback and recommendations based on data analysis and trend indicators.
+
+Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, we have been developing an integrated agent approach, combining the strengths of both the RetrieverAgent and the MonitoringAgent into the Integrated Agent to provide a unified interface for factory information retrieval and real-time monitoring.
+
 
 ## Getting Started
 
@@ -203,7 +212,7 @@ The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-ti
 
 ![overview architeture](images/architecture.png)
 
-The Integrated Agent (`src/agents/integrated_agent.py`) supports an integrated agent approach, combining the strengths of both the `RetrieverAgent` and the `MonitoringAgent` to provde a unified interface for factory information retrieval and real-time monitoring. The integrated agent coordinates between:
+The Integrated Agent (`src/agents/integrated_agent.py`) supports an integrated agent approach, combining the strengths of both the `RetrieverAgent` and the `MonitoringAgent` to provide a unified interface for factory information retrieval and real-time monitoring. The integrated agent coordinates between:
   - RetrieverAgent: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
   - MonitoringAgent: Focuses on real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
 
