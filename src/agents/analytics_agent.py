@@ -724,7 +724,7 @@ class AnalyticsAgent:
             return generate_comprehensive_process_explanation(
                 chart_path, 
                 data_summary,
-                f"User query: {query_text}\n\nPlease provide a comprehensive analysis addressing the user's specific question about the {primary_component.lower()} data."
+                None  # No custom prompt for standard queries
             )
         else:
             return f"Based on the query '{query_text}', here's the {primary_component.lower()} analysis:\n\n{data_summary}"

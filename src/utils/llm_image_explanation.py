@@ -405,7 +405,7 @@ def generate_comprehensive_process_explanation(
         Comprehensive explanation using data + image analysis with optional custom focus
     """
     # Use enhanced settings for more detailed and intelligent analysis
-    analyzer = LLMImageAnalyzer(temperature=0.3, max_tokens=2000)
+    analyzer = LLMImageAnalyzer(temperature=0.1, max_tokens=2000)
 
     # Always use comprehensive data + image analysis
     if custom_prompt and custom_prompt.strip():

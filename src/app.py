@@ -208,22 +208,6 @@ def process_query(query, progress_container=None):
                             else:
                                 chart_figure = visualize_component_activity(component_data, primary_component, '5S')
                             
-                            # Only generate LLM explanation for process analysis queries (not environmental)
-                            query_type = result.get('query_type', 'process_analysis')
-                            if chart_figure is not None and query_type == 'process_analysis':
-                                # Get data summary for LLM analysis
-                                data_summary = agent.generate_process_data_summary(time_range)
-                                
-                                # Generate enhanced LLM explanation with custom prompt
-                                # Save chart temporarily for LLM analysis
-                                if chart_path:
-                                    enhanced_explanation = generate_comprehensive_process_explanation(
-                                        chart_path,
-                                        data_summary,
-                                        f"User query: {query}\n\nPlease provide a comprehensive analysis addressing the user's specific question about the {primary_component.lower()} data."
-                                    )
-                                    if enhanced_explanation:
-                                        response = enhanced_explanation
                                 
                     except Exception as e:
                         print(f"Error generating interactive chart: {e}")
@@ -332,16 +316,6 @@ def display_analytics_dashboard():
                             with col4:
                                 st.metric("Avg Cycle Duration", f"{cycle_analysis.get('avg_cycle_duration', 0):.1f} min")
                             
-                            # Hide cycle details for now - they don't display well
-                            # if cycle_analysis.get('cycle_details'):
-                            #     st.subheader("🔄 Process Cycle Details")
-                            #     with st.expander("View Individual Cycles", expanded=False):
-                            #         for cycle in cycle_analysis['cycle_details']:
-                            #             st.write(f"**Cycle {cycle['cycle_number']}**: {cycle['start_time']} "
-                            #                    f"({cycle['duration_minutes']}min) - {cycle['process_type']}")
-                            #             if cycle['active_components']:
-                            #                 st.write(f"   Active: {', '.join(cycle['active_components'])}")
-                            #             st.write("---")
                     except Exception as e:
                         st.warning(f"Could not load cycle analysis: {e}")
                 
@@ -368,9 +342,7 @@ def display_analytics_dashboard():
                 else:
                     # For other components, show status and positions
                     status_metrics = {k: v for k, v in metrics.items() if '_active_pct' in k}
-                    
                     cols = st.columns(len(status_metrics) if status_metrics else 4)
-                    
                     if status_metrics:
                         for i, (key, value) in enumerate(status_metrics.items()):
                             with cols[i % len(cols)]:
@@ -445,10 +417,7 @@ def display_analytics_dashboard():
                                             st.markdown(analysis)
                                             
                                             # Clean up temporary file
-                                            try:
-                                                os.remove(temp_chart_path)
-                                            except:
-                                                pass
+                                            os.remove(temp_chart_path)
                                         else:
                                             st.error("Could not save chart for analysis")
                                     except Exception as e:
