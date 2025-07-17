@@ -60,14 +60,14 @@ The Fischertechnik factory model incorporates a set of core assets that replicat
 
 ![Factory Components](images/factory_components.png)
 
-## Part 1: Retriever Agent
+### Part 1: Retriever Agent
 
 The RetrieverAgent handles factory documentation retrieval using a sophisticated knowledge graph approach. It combines structured and unstructured data to provide comprehensive answers to user queries.
 
 ![RA](images/toy_factory_ra_implementation.png)
 
 
-### 1. Neo4j DB construction
+#### 1. Neo4j DB construction
 
 This process involves constructing a Neo4j graph and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The graph extracts nodes and relationships from the text chunks of the PDF files. The source documents are stored in the graph and marked with the `document` node label. These `document` nodes are then used to create the Neo4j Vector Index, enabling efficient retrieval and augmentation of information from the graph database.
 
@@ -136,7 +136,7 @@ This script processes the PDF files in the `manual` folder, extracts graph data,
    <em>Snapshot of KG with explicit links between structured information and unstructured text</em>
 </p>
 
-### 2. Retrieval Augmented Generation (RAG) with RetrieverAgent
+#### 2. Retrieval Augmented Generation (RAG) with RetrieverAgent
 
 The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
 
@@ -157,14 +157,14 @@ The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database t
        - IoT Gateway, Node-RED dashboards, and cloud integration.
        - Programming tasks, system setup, and educational simulations.
 
-## Part 2: Monitoring Agent
+### Part 2: Monitoring Agent
 
 The MonitoringAgent provides real-time monitoring capabilities by interfacing with the SINDIT Knowledge Graph-based Digital Twin framework.
 
 ![MA](images/toy_factory_ma_implementation.png)
 
 
-### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
+#### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
 
 SINDIT is structured according to the reference architecture for digital twin (DT) systems developed in the COGNIMAN project. It enhances flexibility and modularity through interfaces that connect different components for building knowledge graph-based DTs. See the [SINDIT documentation](https://github.com/SINTEF-9012/SINDIT20) to set up the framework.
 
@@ -202,7 +202,7 @@ This script streamlines the process of registering MQTT connections, streaming p
   <em>Result: Snapshot of the SINDIT graph created for the Fischertechnik factorys</em>
 </p>
 
-### 2. Monitoring Agent Architecture
+#### 2. Monitoring Agent Architecture
 
 The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-time monitoring and analysis of manufacturing data by interfacing with the SINDIT Knowledge Graph API. Below is an overview of its main components and functionalities:
   - `SINDITDataTool`: A custom tool that classifies user queries, determines relevant manufacturing assets (e.g., VGR, HBW, sensors), and retrieves real-time data from the SINDIT API. It maps natural language queries to specific asset URIs and fetches associated data, including sensor readings and connection status.
@@ -211,21 +211,12 @@ The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-ti
   - `query`: The main entry point for user queries. It retrieves real-time data, formats it with the original query, and generates a comprehensive response using the LLM conversation chain.
   - `get_sindit_status`: Fetches the connection status of MQTT connections from the SINDIT Knowledge Graph API.
 
-## Part 3: AnalyticsAgent
+### Part 3: AnalyticsAgent
 
-The AnalyticsAgent provides comprehensive historical data analysis, visualization, and LLM-powered insights for manufacturing processes.
+The Analytics Agent provides comprehensive historical data analysis, visualization, and LLM-powered insights for manufacturing processes. It includes advanced analytics such as process cycle detection, component activity calculation, position movement analysis, and environmental condition monitoring. Additionally, it generates comprehensive process explanations using multimodal chart analysis.
 
 ![AA](images/toy_factory_aa_implementation.png)
-
-- **Advanced Analytics**:
-  - Process cycle detection
-  - Component activity calculation
-  - Position movement analysis
-  - Environmental condition monitoring
-
-- **LLM-Powered Insights**: Generates comprehensive process explanations using multimodal chart analysis
   
-
 1. Time Series Loading: Load resampled component data
    - File: `src/utils/ts_preprocessing.py`
    - Function: `load_resampled_requested_components()`
@@ -245,7 +236,7 @@ The AnalyticsAgent provides comprehensive historical data analysis, visualizatio
        - Position movement analysis
        - Environmental condition monitoring
 
-## Part 4: Integrated Agent
+### Part 4: Integrated Agent
 
 The Integrated Agent provides a unified interface for factory information retrieval, real-time monitoring, and advanced analytics by orchestrating multiple specialized agents:
   - `RetrieverAgent`: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
@@ -253,7 +244,7 @@ The Integrated Agent provides a unified interface for factory information retrie
   - `AnalyticsAgent`: Powers historical data analysis, visualization, and AI-driven insights. It supports natural language queries for time series analysis, process cycle detection, and component activity evaluation, leveraging multimodal LLMs for comprehensive process explanations.
 
 
-## Result
+### Result
 
 The demo highlights the full capabilities of the multi-agent manufacturing assistant system within a Streamlit application. Users can interact with the following agents:
    - `RetrieverAgent`: Provides knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models.
