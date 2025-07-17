@@ -1,13 +1,13 @@
 # LFLagents
 Learning Feedback Loop agent-based approach is a multi-agent framework to assist users in retrieving information and monitoring the factory status. Three main components of the framework are being constructed: 
 
-- Generative AI and LLMs-based Analysis Module: Collect real-time and historical data from the Sensors and IoT Devices in the manufacturing process as well as gather insights and observations from operators through visual interfaces and plain language inputs (using GUIs). Analyzing trends and processing real-time and historical data to help guide decisions.
+- Generative AI and LLMs-based Analysis Module: Collect real-time and historical data from the Sensors and IoT Devices in the manufacturing process as well as gather insights and observations from operators through visual interfaces and plain language inputs (using GUIs). This module analyzes trends and processes real-time and historical data to help guide decisions.
 
-- Interactive Dashboards and GUIs: Give operators user-friendly graphical interfaces so they can see trends and statistical analysis. Offer operators the ability to interact with data, investigate various scenarios, and provide feedback.
+- Interactive Dashboards and GUIs: Give operators user-friendly graphical interfaces so they can see trends and statistical analysis. Enable operators to interact with data, explore various scenarios, and provide feedback.
 
 - Recommendation Module: (Real-time) manufacturing process reconfiguration suggestions may be made by using AI agents to automatically produce feedback and recommendations based on data analysis and trend indicators.
 
-Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, we have been developing an integrated agent approach, combining the strengths of both the RetrieverAgent and the MonitoringAgent into the Integrated Agent to provide a unified interface for factory information retrieval and real-time monitoring.
+Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, the Analytics Agent provides semantic insights and interprets charts from historical sensor data by computing relevant metrics and detecting patterns. Finally, we have been developing an integrated agent approach, combining the strengths of the RetrieverAgent, the MonitoringAgent and the AnalyticsAgent into the Integrated Agent to provide a unified interface for factory information retrieval, real-time monitoring and time-series analytics within a single interactive agent framework.
 
 ## Getting Started
 
@@ -17,7 +17,7 @@ Generative AI and LLMs-based Analysis Module has been developed first with a Ret
 git clone https://github.com/SINTEF-9012/LFLagents.git
 ```
 
-### 2. Install the requirements`
+### 2. Install the requirements
 
 ```bash
 pip install -r requirements.txt
@@ -52,13 +52,11 @@ CHAT_MODEL = "gpt-4o"
 EMBEDDING_MODEL = "text-embedding-3-small"
 ```
 
-## Overview
-
-In this project we develop a multi-agent system on Fischertechnik Training Factory to assist users in retrieving information, monitoring factory status, and analyzing manufacturing data.
+## Use Case 1: Manufacturing Running Example - Fischertechnik Factory
 
 ![Factory](images/factory.png)
 
-There are 6 main components of the factory: Deliver and Pick-up Station (DPS), Environmental station with surveillance camera (SSC),Vacuum Gripper Robot (VGR), Automated High-bay Warehouse (HBW), Multi-Processing Station with klin (MPO) and Sorting Line with Color Detection (SLD).
+The Fischertechnik factory model incorporates a set of core assets that replicate main components in modern manufacturing system. There are 6 main components of the factory: Deliver and Pick-up Station (DPS), Environmental station with surveillance camera (SSC),Vacuum Gripper Robot (VGR), Automated High-bay Warehouse (HBW), Multi-Processing Station with klin (MPO) and Sorting Line with Color Detection (SLD).
 
 ![Factory Components](images/factory_components.png)
 
