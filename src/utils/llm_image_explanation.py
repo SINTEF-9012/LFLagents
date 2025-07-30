@@ -1,3 +1,11 @@
+"""
+LLM Image Explanation Utilities for Manufacturing Data Visualization.
+
+This module provides utilities for generating comprehensive explanations of
+manufacturing data visualizations using Large Language Models with vision
+capabilities, enabling multimodal analysis of charts and graphs.
+"""
+
 import base64
 import os
 from typing import Dict
@@ -18,7 +26,7 @@ class LLMImageAnalyzer:
     DEFAULT_MODEL = CHAT_MODEL
     DEFAULT_TEMPERATURE = 0.3  # Slightly higher for more creative analysis
     DEFAULT_MAX_TOKENS = 2000  # Increased for more detailed analysis
-    
+
     # Shared factory context and instructions
     FACTORY_PROCESS_CONTEXT = """
     **FACTORY PROCESS CONTEXT:**
@@ -382,7 +390,7 @@ def save_chart_as_image(fig, filepath: str) -> bool:
 
 
 def generate_comprehensive_process_explanation(
-    image_path: str, 
+    image_path: str,
     process_data_summary: str,
     custom_prompt: str = None
 ) -> str:
