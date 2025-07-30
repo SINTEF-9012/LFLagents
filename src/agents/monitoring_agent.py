@@ -1,3 +1,11 @@
+"""
+Monitoring Agent for Real-time Manufacturing Process Monitoring.
+
+This module provides real-time monitoring capabilities for manufacturing processes,
+including anomaly detection, status tracking, and proactive alerting for
+manufacturing operations.
+"""
+
 import json
 import os
 import sys
@@ -29,7 +37,7 @@ class SINDITDataTool(BaseTool):
     name: str = "sindit_data_tool"
     description: str = "Tool for retrieving real-time manufacturing data from SINDIT Knowledge Graph API."
     args_schema: type[MonitoringQuery] = MonitoringQuery
-    
+
     def classify_query(self, query: str) -> Dict[str, Any]:
         key_assets = [
             "http://sindit.sintef.no/2.0#factory-sensor",
@@ -42,7 +50,7 @@ class SINDITDataTool(BaseTool):
             "http://sindit.sintef.no/2.0#dsi",
             "http://sindit.sintef.no/2.0#order",
         ]
-        
+
         asset_keywords = {
             "vgr": ["vgr", "vacuum gripper", "gripper", "robot"],
             "hbw": ["hbw", "high bay warehouse", "warehouse", "storage"],
@@ -55,9 +63,9 @@ class SINDITDataTool(BaseTool):
             "order": ["order", "production order", "manufacturing order", "order status"],
             "Stock": ["stock", "inventory", "material"]
         }
-        
+
         query_lower = query.lower()
-        
+
         # Find specific assets mentioned in the query
         relevant_assets = []
         for asset_key, keywords in asset_keywords.items():
@@ -65,45 +73,45 @@ class SINDITDataTool(BaseTool):
                 asset_uri = f"http://sindit.sintef.no/2.0#{asset_key}"
                 if asset_uri in key_assets:
                     relevant_assets.append(asset_uri)
-                    
+
         # If no specific assets found, default to key manufacturing assets
         if not relevant_assets:
             return key_assets
-        
+
         return relevant_assets
 
     def _run(self, query: str, **kwargs):
         """
         Retrieve real-time data from SINDIT DT Platform based on the query.
-        
+
         Args:
             query: Natural language query about manufacturing data
-        
+
         Returns:
             dict: Real-time data from SINDIT DT Platform
         """
-        
+
         relevant_assets = self.classify_query(query)
-        
+
         # Get available data using correct endpoints
         streaming_data = {}
-        
+
         # Get all node types to understand available data structure
         node_types = query_get_api('kg/node_types')
         streaming_data['node_types'] = node_types
-        
+
         assets = []
-        
+
         for asset_uri in relevant_assets:
             asset_data = query_get_api('kg/node', asset_uri, 'node_uri')
             assets.append(asset_data)
-        
+
         streaming_data['data'] = assets
-        
-        # Get connection information     
+
+        # Get connection information
         connection_data = query_get_api('kg/node', "http://sindit.sintef.no/2.0#mqtt-connection", 'node_uri')
         streaming_data['connections'] = [connection_data] if connection_data else []
-        
+
         return streaming_data
 
 
@@ -115,18 +123,18 @@ class SINDITDataTool(BaseTool):
 #     def _run(self, query: str, **kwargs):
 #         """
 #         Analyze manufacturing status and provide insights.
-        
+
 #         Args:
 #             query: Natural language query about manufacturing status
 #             **kwargs: Additional parameters like asset_type, property_type
-        
+
 #         Returns:
 #             dict: Analysis results
 #         """
 #         # Initialize the SINDIT data tool
 #         data_tool = SINDITDataTool()
 #         raw_data = data_tool.run(query)
-        
+
 #         # Analyze the data
 #         analysis_results = {
 #             "timestamp": datetime.now().isoformat(),
@@ -134,10 +142,10 @@ class SINDITDataTool(BaseTool):
 #             # "status": "analyzing",
 #             "summary": []
 #         }
-        
+
 #         # Analyze streaming properties
 #         data = raw_data['data']
-        
+
 #         # Extract types and topics of assets and sensors
 #         assets_topics = []
 #         assets_types = []
@@ -152,59 +160,59 @@ class SINDITDataTool(BaseTool):
 #                     for prop in asset['assetProperties']:
 #                         sensor_topics.append(prop['uri'])
 #                         sensor_types.append(prop['label'])
-        
+
 #         analysis_results["assets_topics"] = list(set(assets_topics))
 #         analysis_results["assets_types"] = list(set(assets_types))
 #         analysis_results["sensor_topics"] = list(set(sensor_topics))
 #         analysis_results["sensor_types"] = list(set(sensor_types))
-        
-        
+
+
 #         # Analyze connections
 #         if 'connections' in raw_data:
 #             connections = raw_data['connections'][0]
 #             analysis_results["active_connections"] = connections['isConnected']
-        
+
 #         # Generate insights based on analysis
 #         summary = []
-        
+
 #         if analysis_results.get("active_connections") is True:
 #             summary.append(f"Mqtt is active with {analysis_results['active_connections']} live connections.")
 #         else:
 #             summary.append("Mqtt is not connected or has no active connections.")
-        
+
 #         if analysis_results.get("sensor_types"):
 #             summary.append(f"Available sensor data includes: {', '.join(analysis_results['sensor_types'])}.")
-        
+
 #         analysis_results["summary"] = summary
 #         # analysis_results["status"] = "completed"
-        
+
 #         return analysis_results
 
 class MonitoringAgent:
     """
     Monitoring Agent for real-time manufacturing data retrieval and analysis.
-    
+
     This agent connects to the SINDIT Knowledge Graph API to retrieve real-time
     manufacturing data and provides insights about factory operations, sensor status,
     and equipment monitoring.
     """
-    
+
     def __init__(self):
         """Initialize the Monitoring Agent with necessary tools and LLM."""
-        
+
         # Initialize tools
         self.sindit_data_tool = SINDITDataTool()
         # self.status_analyzer = ManufacturingStatusAnalyzer()
-        
+
         # Initialize chat model
         self.llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
-        
+
         # Initialize conversation chain
         self.initialize_conversation_chain()
-    
+
     def initialize_conversation_chain(self):
         """Initialize the conversation chain for the monitoring agent."""
-        
+
         self.system_msg_template = SystemMessagePromptTemplate.from_template(
             template="""
             You are a specialized Monitoring Agent for the fischertechnik Training Factory Industry 4.0 system.
@@ -240,92 +248,97 @@ class MonitoringAgent:
             and suggest alternative monitoring approaches.
             """
         )
-        
+
         self.human_msg_template = HumanMessagePromptTemplate.from_template(template="{input}")
-        
+
         self.prompt_template = ChatPromptTemplate.from_messages([
             self.system_msg_template,
             self.human_msg_template
         ])
-        
+
         self.conversation_chain = LLMChain(
             llm=self.llm,
             prompt=self.prompt_template,
             verbose=True
         )
-    
+
     def get_realtime_context(self, query: str) -> Dict[str, Any]:
         """
         Get real-time monitoring context.
-        
+
         Args:
             query: User's question
-        
+
         Returns:
             dict: Real-time monitoring context
         """
-        
+
         # Get real-time data
         realtime_data = self.sindit_data_tool.run(query)
-        
+
         return {
             "realtime_data": realtime_data,
             "source": "Monitoringgent"
         }
-    
+
     # def analyze_manufacturing_status(self, query: str, asset_type: str = None, property_type: str = None) -> Dict[str, Any]:
     #     """
     #     Analyze current manufacturing status and provide insights.
-        
+
     #     Args:
     #         query: Natural language query about manufacturing status
     #         asset_type: Specific asset type to analyze (optional)
     #         property_type: Specific property type to analyze (optional)
-        
+
     #     Returns:
     #         dict: Analysis results and insights
     #     """
     #     return self.status_analyzer.run(query)
-    
+
     def query(self, user_query: str) -> str:
         """
         Process a user query about manufacturing monitoring.
-        
+
         Args:
             user_query: User's question about manufacturing status or real-time data
-        
+
         Returns:
             str: Comprehensive response with real-time data analysis
         """
         # Retrieve real-time data relevant to the query by using the SINDIT data tool
         real_time_context = self.get_realtime_context(user_query)
         real_time_data = real_time_context.get("realtime_data", {})
-        
+
         # # Then analyze the manufacturing status by using the status analyzer tool
         # status_analysis = self.analyze_manufacturing_status(user_query)
-                
+
         # Format the input for the conversation chain
         formatted_input = f"""
         User Query: {user_query}
-        
+
         Real-time Data Retrieved:
         {json.dumps(real_time_data, indent=2)}
-        
+
         Please provide a comprehensive response based on this real-time manufacturing data.
         """
-        
+
         # Generate response using the conversation chain
-        response = self.conversation_chain.run(input=formatted_input)
+        response_result = self.conversation_chain.invoke({"input": formatted_input})
         
+        # Extract the text content from the response
+        if isinstance(response_result, dict):
+            response = response_result.get('text', str(response_result))
+        else:
+            response = str(response_result)
+
         return response
-    
+
     def get_sindit_status(self) -> Dict[str, Any]:
         """
         Retrieve connection info of MQTT connections from SINDIT Knowledge Graph API.
-        
+
         Returns:
             dict: Real-time data from SINDIT DT Platform
         """
 
         return query_get_connections_info('kg/node', "http://sindit.sintef.no/2.0#mqtt-connection")
-        

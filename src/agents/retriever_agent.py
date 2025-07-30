@@ -1,3 +1,11 @@
+"""
+Retriever Agent for Manufacturing Knowledge Graph Querying.
+
+This module provides retrieval capabilities for manufacturing knowledge graphs,
+including semantic search, graph database querying, and knowledge extraction
+from structured manufacturing data.
+"""
+
 import os
 import json
 from datetime import datetime
@@ -31,7 +39,7 @@ neo4j_graph = graph
 
 class Question(BaseModel):
     question: str
-    
+
 class Neo4jVectorTool(BaseTool):
     name: str = "neo4j_vector_tool"
     description: str = "Tool for performing similarity-based retrieval from the Neo4j vector index."
@@ -40,13 +48,13 @@ class Neo4jVectorTool(BaseTool):
     def _run(self, question):
         # Initialize Neo4j vector index
         neo4j_vector = load_vector_index()
-        
+
         # Perform similarity search
         results = neo4j_vector.similarity_search(question, k=5)
         all_pages = "\n".join([result.page_content for result in results])
-        
+
         return all_pages
-    
+
 class Neo4jCypherTool(BaseTool):
     name: str = "neo4j_cypher_tool"
     description: str = "Tool for retrieving structured, interconnected, and relational knowledge from the Neo4j graph."
@@ -62,7 +70,7 @@ class Neo4jCypherTool(BaseTool):
         Returns:
             dict: The results of the Cypher query executed on the Neo4j graph.
         """
-                
+
         # # Initialize Cypher validation tool
         # corrector_schema = [
         #     Schema(el["start"], el["type"], el["end"])
@@ -108,17 +116,17 @@ class Neo4jCypherTool(BaseTool):
             top_k=5,
             allow_dangerous_requests=True,
         )
-        
+
         return chain.run(question)
 
 class RetrieverAgent:
 
     def __init__(self):
-        
-        # Initialize tools        
+
+        # Initialize tools
         self.cypher_tool = Neo4jCypherTool()
         self.vector_tool = Neo4jVectorTool()
-        
+
         # Initialize chat model
         self.llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
         # Initialize session state variables
@@ -126,8 +134,8 @@ class RetrieverAgent:
 
         # Initialize conversation chain
         self.initialize_conversation_chain()
-        
-        
+
+
     def initialize_session_state(self):
         if 'responses' not in st.session_state:
             st.session_state['responses'] = ["How can I help you today?"]
@@ -140,10 +148,10 @@ class RetrieverAgent:
 
         if 'buffer_memory' not in st.session_state:
             st.session_state['buffer_memory'] = ConversationBufferWindowMemory(k=1000000000, return_messages=True)
-            
+
         if 'chat_history' not in st.session_state:
             st.session_state['chat_history'] = []
-        
+
 
     def initialize_conversation_chain(self):
         self.system_msg_template = SystemMessagePromptTemplate.from_template(
@@ -174,7 +182,7 @@ class RetrieverAgent:
             llm=self.llm,
             verbose=True
         )
-    
+
     # def save_chat_history(self,chat_history, folder_name, file_name):
     #     folder_path = os.path.join(os.getcwd(), folder_name)
     #     if not os.path.exists(folder_path):
@@ -183,58 +191,58 @@ class RetrieverAgent:
     #     with open(file_path, "w", encoding="utf-8") as file:
     #         for query, response in chat_history:
     #             file.write(f"User: {query}\nBot: {response}\n\n")
-                
+
     def get_documentation_context(self, query: str) -> Dict[str, Any]:
         """
         Get relevant documentation context using retriever tools.
-        
+
         Args:
             query: User's question
-        
+
         Returns:
             dict: Documentation context
         """
         # Get vector similarity results
         vector_results = self.vector_tool.run(query)
-        
+
         # Get cypher query results
         cypher_results = self.cypher_tool.run(query)
-        
+
         return {
             "vector_results": vector_results,
             "cypher_results": cypher_results,
             "source": "RetrieverAgent",
             "timestamp": datetime.now().isoformat()
         }
-    
+
     def classify_documentation_query(self, query: str) -> Dict[str, bool]:
         """
         Classify if a query needs documentation retrieval.
-        
+
         Args:
             query: User's question
-        
+
         Returns:
             dict: Classification of documentation requirements
         """
         query_lower = query.lower()
-        
+
         # Keywords that indicate documentation needs
         documentation_keywords = [
             'how to', 'setup', 'configure', 'install', 'procedure', 'manual',
             'guide', 'steps', 'tutorial', 'programming', 'troubleshoot',
             'documentation', 'explain', 'what is', 'describe'
         ]
-        
+
         # Component-specific keywords
         component_keywords = [
             'plc', 'tia portal', 'simatic', 's7-1500', 'txt controller',
             'mqtt', 'opc ua', 'node-red', 'iot gateway', 'dashboard'
         ]
-        
+
         needs_documentation = any(keyword in query_lower for keyword in documentation_keywords)
         is_component_query = any(keyword in query_lower for keyword in component_keywords)
-        
+
         return {
             'needs_documentation': needs_documentation or is_component_query,
             'is_how_to_query': 'how to' in query_lower or 'how do' in query_lower,
@@ -242,57 +250,57 @@ class RetrieverAgent:
             'is_setup_query': any(word in query_lower for word in ['setup', 'configure', 'install']),
             'is_troubleshoot_query': 'troubleshoot' in query_lower or 'problem' in query_lower
         }
-    
+
     def query(self, user_query: str) -> str:
         """
         Process a user query with full documentation context.
-        
+
         Args:
             user_query: User's question
-        
+
         Returns:
             str: Response with integrated documentation context
         """
         try:
             # Get documentation context
             doc_context = self.get_documentation_context(user_query)
-            
+
             # Classify the query
             query_classification = self.classify_documentation_query(user_query)
-            
+
             # Prepare enhanced input for the conversation
             enhanced_input = f"""
             User Query: {user_query}
-            
+
             Query Classification: {json.dumps(query_classification, indent=2)}
-            
+
             Documentation Context:
             Vector Search Results: {doc_context.get('vector_results', 'No vector results')}
-            
+
             Cypher Query Results: {doc_context.get('cypher_results', 'No cypher results')}
-            
+
             Based on the above context and documentation, please provide a comprehensive answer.
             """
-            
+
             # Use the existing conversation chain
             response = self.conversation.predict(input=enhanced_input)
-            
+
             return response
-            
+
         except Exception as e:
             return f"Error processing documentation query: {str(e)}"
-        
+
     def get_neo4j_status(self) -> Dict[str, Any]:
         """
         Get a comprehensive overview of the current Neo4j system status.
-        
+
         Returns:
             dict: Complete system overview with all available data
         """
         # Return the status Neo4jDB connection
-        
+
         index_info = graph.query("SHOW INDEXES")
-        
+
         neo4j_status = {}
 
         for index in index_info:
@@ -303,5 +311,5 @@ class RetrieverAgent:
                 'state': index['state'],
                 'last_read': index['lastRead'].to_native().strftime("%Y-%m-%d %H:%M:%S UTC") if index['lastRead'] else None
             }
-            
+
         return neo4j_status
