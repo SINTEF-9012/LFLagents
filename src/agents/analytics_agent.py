@@ -1,10 +1,21 @@
+"""
+Analytics Agent for Manufacturing Data Analysis.
+
+This module provides comprehensive analytics capabilities for manufacturing data,
+including time-series analysis, component performance monitoring, environmental
+data processing, and advanced visualization features with LLM-powered explanations.
+"""
+
 import os
 import sys
 import pandas as pd
 import numpy as np
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple, Union
+from functools import lru_cache
+import logging
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -33,30 +44,109 @@ from viz import (
 
 class AnalyticsAgent:
     """
-    Refactored Analytics Agent for manufacturing data visualization and analysis.
+    Performance-optimized Analytics Agent for manufacturing data visualization and analysis.
 
     This agent provides essential data processing capabilities:
-    1. Loading and processing historical factory data
-    2. Generating metrics for dashboard display
+    1. Loading and processing historical factory data with caching
+    2. Generating metrics for dashboard display with optimized calculations
     3. Processing natural language queries with chart generation
     4. Providing LLM-powered process analysis
+
+    Performance improvements:
+    - Data caching to avoid redundant loading
+    - Vectorized operations for metrics calculations
+    - Pre-compiled regex patterns for query parsing
+    - Memory-efficient data processing
     """
 
+    # Pre-compile regex patterns for better performance
+    _TIME_PATTERNS = [
+        (re.compile(r'last\s+(\d+)\s+minutes?', re.IGNORECASE), "minutes"),
+        (re.compile(r'last\s+(\d+)\s+hours?', re.IGNORECASE), "hours"),
+        (re.compile(r'last\s+(\d+)\s+days?', re.IGNORECASE), "days"),
+        (re.compile(r'past\s+(\d+)\s+minutes?', re.IGNORECASE), "minutes"),
+        (re.compile(r'past\s+(\d+)\s+hours?', re.IGNORECASE), "hours"),
+        (re.compile(r'past\s+(\d+)\s+days?', re.IGNORECASE), "days"),
+        (re.compile(r'(\d+)\s+minutes?\s+ago', re.IGNORECASE), "minutes"),
+        (re.compile(r'(\d+)\s+hours?\s+ago', re.IGNORECASE), "hours"),
+        (re.compile(r'(\d+)\s+days?\s+ago', re.IGNORECASE), "days"),
+    ]
+    
+    _DATE_PATTERNS = [
+        re.compile(r'(\d{1,2})/(\d{1,2})/(\d{4})'),
+        re.compile(r'(\d{4})-(\d{1,2})-(\d{1,2})'),
+        re.compile(r'(\d{1,2})-(\d{1,2})-(\d{4})'),
+        re.compile(r'(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)\s+(\d{4})', re.IGNORECASE),
+        re.compile(r'([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)\s+(\d{4})', re.IGNORECASE),  # "december 1st 2022"
+    ]
+
+    # Pre-define column types for fast lookup
+    _ENV_TYPES = frozenset(['temperature', 'humidity', 'air_quality', 'pressure', 'brightness', 'gas'])
+    _POS_TYPES = frozenset(['pos_', 'position', 'actual_pos', 'target_pos'])
+    
+    # Environmental query keywords
+    _ENV_KEYWORDS = frozenset([
+        'environment', 'environmental', 'temperature', 'humidity', 'air',
+        'pressure', 'gas', 'quality', 'sensor', 'condition'
+    ])
+
     def __init__(self):
-        """Initialize the Analytics Agent with data processing capabilities."""
+        """Initialize the Analytics Agent with performance optimizations."""
         self.component_config = FACTORY_COMPONENT_CONFIG
         self.available_components = list(self.component_config.keys())
         self.default_time_range = self._get_default_time_range()
         self.loaded_data = {}
+        self._data_cache = {}  # Cache for processed data
+        self._metrics_cache = {}  # Cache for calculated metrics
+        self._cache_timestamps = {}  # Track cache validity
+        
         self.charts_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "generated_charts",
         )
         os.makedirs(self.charts_dir, exist_ok=True)
 
-        # Initialize LLM and Chart utilities
-        self.llm_analyzer = LLMImageAnalyzer()
-        self.chart_saver = ChartImageSaver()
+        # Initialize LLM and Chart utilities (lazy loading)
+        self._llm_analyzer = None
+        self._chart_saver = None
+        
+        # Configure logging for performance monitoring
+        self.logger = logging.getLogger(__name__)
+
+    @property
+    def llm_analyzer(self):
+        """Lazy load LLM analyzer to improve startup time."""
+        if self._llm_analyzer is None:
+            self._llm_analyzer = LLMImageAnalyzer()
+        return self._llm_analyzer
+
+    @property
+    def chart_saver(self):
+        """Lazy load chart saver to improve startup time."""
+        if self._chart_saver is None:
+            self._chart_saver = ChartImageSaver()
+        return self._chart_saver
+
+    def clear_cache(self) -> None:
+        """Clear all caches to free memory."""
+        self._data_cache.clear()
+        self._metrics_cache.clear()
+        self._cache_timestamps.clear()
+        
+        # Clear LRU caches
+        self.parse_time_range_from_query.cache_clear()
+        self._detect_components_from_query_cached.cache_clear()
+        
+        self.logger.info("All caches cleared")
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics for performance monitoring."""
+        return {
+            "data_cache_size": len(self._data_cache),
+            "metrics_cache_size": len(self._metrics_cache),
+            "parse_time_cache_info": self.parse_time_range_from_query.cache_info()._asdict(),
+            "detect_components_cache_info": self._detect_components_from_query_cached.cache_info()._asdict(),
+        }
 
     def _get_default_time_range(self) -> Tuple[datetime, datetime]:
         """Get a default time range for data loading."""
@@ -80,14 +170,16 @@ class AnalyticsAgent:
         components: List[str],
         time_range: Optional[Tuple[datetime, datetime]] = None,
         resample_interval: str = "5S",
+        force_reload: bool = False,
     ) -> Dict[str, pd.DataFrame]:
         """
-        Load component data for the specified time range.
+        Load component data for the specified time range with caching.
 
         Args:
             components: List of component names to load
             time_range: Optional time range tuple (start, end)
             resample_interval: Resampling interval (default: '5S')
+            force_reload: Force reload data ignoring cache
 
         Returns:
             Dictionary with component names as keys and DataFrames as values
@@ -95,23 +187,45 @@ class AnalyticsAgent:
         if time_range is None:
             time_range = self.default_time_range
 
+        # Create cache key
+        cache_key = (tuple(components), time_range, resample_interval)
+        
+        # Check cache first unless force_reload is True
+        if not force_reload and cache_key in self._data_cache:
+            cache_time = self._cache_timestamps.get(cache_key, 0)
+            # Cache is valid for 1 hour for performance
+            if time.time() - cache_time < 3600:
+                cached_data = self._data_cache[cache_key]
+                self.loaded_data.update(cached_data)
+                return cached_data
+
         try:
+            start_time = time.time()
+            
             # Load data for requested components
             data_dict = load_resampled_requested_components(
                 components, time_range, resample_interval
             )
 
+            # Cache the result
+            self._data_cache[cache_key] = data_dict
+            self._cache_timestamps[cache_key] = time.time()
+            
             # Store loaded data
             self.loaded_data.update(data_dict)
+            
+            load_time = time.time() - start_time
+            self.logger.debug(f"Loaded data for {components} in {load_time:.3f}s")
 
             return data_dict
 
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"Error loading component data: {e}")
             return {}
 
     def get_component_metrics(self, component: str) -> Dict[str, Any]:
         """
-        Get metrics for a specific component.
+        Get metrics for a specific component with caching and optimized calculations.
 
         Args:
             component: Component name
@@ -127,90 +241,108 @@ class AnalyticsAgent:
         if data.empty:
             return {"error": f"No data available for component {component}"}
 
+        # Check cache first
+        cache_key = (component, id(data))  # Use data object ID for cache key
+        if cache_key in self._metrics_cache:
+            return self._metrics_cache[cache_key]
+
+        start_time = time.time()
         metrics = {}
 
         try:
-            # Calculate metrics based on component type
+            # Use vectorized operations for better performance
             if component == "ENVIRONMENTAL":
-                # Environmental metrics
-                env_columns = [
-                    col
-                    for col in data.columns
-                    if any(
-                        env_type in col.lower()
-                        for env_type in [
-                            "temperature",
-                            "humidity",
-                            "air_quality",
-                            "pressure",
-                            "brightness",
-                            "gas",
-                        ]
-                    )
-                ]
-
-                for col in env_columns:
-                    if data[col].notna().any():
-                        metrics[f"{col}_avg"] = round(data[col].mean(), 2)
-                        metrics[f"{col}_min"] = round(data[col].min(), 2)
-                        metrics[f"{col}_max"] = round(data[col].max(), 2)
-                        metrics[f"{col}_std"] = round(data[col].std(), 2)
-
+                metrics = self._calculate_environmental_metrics_vectorized(data)
             elif component == "FACTORY":
-                # Factory overview metrics
-                all_columns = [
-                    col for col in data.columns if not col.startswith("factory_")
-                ]
-
-                if all_columns:
-                    # Calculate activity percentages using status codes
-                    activity_data = []
-                    for col in all_columns:
-                        if "status_code" in col:
-                            col_data = data[col]
-                            # For status codes: != 1 means active
-                            activity_pct = (col_data != 1).mean() * 100
-                            activity_data.append(activity_pct)
-
-                    if activity_data:
-                        metrics["avg_activity_pct"] = round(
-                            sum(activity_data) / len(activity_data), 2
-                        )
-                        metrics["active_time_minutes"] = round(
-                            len(data) * 5 / 60, 2
-                        )  # 5-second intervals
-
+                metrics = self._calculate_factory_metrics_vectorized(data)
             else:
-                # Component-specific metrics
-                # Status columns - use status codes preferentially
-                status_columns = [col for col in data.columns if "status_code" in col]
-                for col in status_columns:
-                    col_data = data[col]
-                    # For status codes: != 1 means active
-                    active_pct = (col_data != 1).mean() * 100
-                    metrics[f"{col}_active_pct"] = round(active_pct, 2)
+                metrics = self._calculate_component_metrics_vectorized(data)
 
-                # Position columns
-                position_columns = [
-                    col
-                    for col in data.columns
-                    if any(
-                        pos_type in col
-                        for pos_type in ["pos_", "position", "actual_pos", "target_pos"]
-                    )
-                ]
+            # Cache the result
+            self._metrics_cache[cache_key] = metrics
+            
+            calc_time = time.time() - start_time
+            self.logger.debug(f"Calculated metrics for {component} in {calc_time:.3f}s")
 
-                for col in position_columns:
-                    if data[col].notna().any():
-                        metrics[f"{col}_avg"] = round(data[col].mean(), 2)
-                        metrics[f"{col}_min"] = round(data[col].min(), 2)
-                        metrics[f"{col}_max"] = round(data[col].max(), 2)
-                        metrics[f"{col}_range"] = round(
-                            data[col].max() - data[col].min(), 2
-                        )
-
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"Error calculating metrics for {component}: {e}")
             metrics["error"] = "Error calculating metrics"
+
+        return metrics
+
+    def _calculate_environmental_metrics_vectorized(self, data: pd.DataFrame) -> Dict[str, Any]:
+        """Calculate environmental metrics using vectorized operations."""
+        metrics = {}
+        
+        # Find environmental columns efficiently
+        env_columns = [col for col in data.columns 
+                      if any(env_type in col.lower() for env_type in self._ENV_TYPES)]
+
+        if not env_columns:
+            return metrics
+
+        # Vectorized calculations for all columns at once
+        for col in env_columns:
+            col_data = data[col]
+            if col_data.notna().any():
+                # Calculate all statistics in one pass
+                stats = col_data.describe()
+                metrics[f"{col}_avg"] = round(stats['mean'], 2)
+                metrics[f"{col}_min"] = round(stats['min'], 2)
+                metrics[f"{col}_max"] = round(stats['max'], 2)
+                metrics[f"{col}_std"] = round(stats['std'], 2)
+
+        return metrics
+
+    def _calculate_factory_metrics_vectorized(self, data: pd.DataFrame) -> Dict[str, Any]:
+        """Calculate factory metrics using vectorized operations."""
+        metrics = {}
+        
+        # Filter columns efficiently
+        all_columns = [col for col in data.columns if not col.startswith("factory_")]
+
+        if all_columns:
+            # Find status code columns
+            status_columns = [col for col in all_columns if "status_code" in col]
+            
+            if status_columns:
+                # Vectorized activity calculation
+                status_data = data[status_columns]
+                activity_percentages = ((status_data != 1).mean() * 100).values
+                
+                if len(activity_percentages) > 0:
+                    metrics["avg_activity_pct"] = round(np.mean(activity_percentages), 2)
+                    metrics["active_time_minutes"] = round(len(data) * 5 / 60, 2)
+
+        return metrics
+
+    def _calculate_component_metrics_vectorized(self, data: pd.DataFrame) -> Dict[str, Any]:
+        """Calculate component-specific metrics using vectorized operations."""
+        metrics = {}
+
+        # Status columns - vectorized processing
+        status_columns = [col for col in data.columns if "status_code" in col]
+        if status_columns:
+            status_data = data[status_columns]
+            activity_percentages = (status_data != 1).mean() * 100
+            
+            for col in status_columns:
+                metrics[f"{col}_active_pct"] = round(activity_percentages[col], 2)
+
+        # Position columns - vectorized processing
+        position_columns = [col for col in data.columns 
+                           if any(pos_type in col for pos_type in self._POS_TYPES)]
+
+        if position_columns:
+            position_data = data[position_columns].select_dtypes(include=[np.number])
+            
+            for col in position_data.columns:
+                if position_data[col].notna().any():
+                    stats = position_data[col].describe()
+                    metrics[f"{col}_avg"] = round(stats['mean'], 2)
+                    metrics[f"{col}_min"] = round(stats['min'], 2)
+                    metrics[f"{col}_max"] = round(stats['max'], 2)
+                    metrics[f"{col}_range"] = round(stats['max'] - stats['min'], 2)
 
         return metrics
 
@@ -367,8 +499,7 @@ class AnalyticsAgent:
 
     def _analyze_process_cycles(self, factory_data: pd.DataFrame) -> Dict[str, Any]:
         """
-        Enhanced cycle detection considering multiple components and their coordination.
-        Now includes per-cycle process type identification.
+        Optimized cycle detection with vectorized operations and improved algorithms.
 
         Args:
             factory_data: Factory data DataFrame
@@ -380,12 +511,11 @@ class AnalyticsAgent:
             "cycle_count": 0,
             "avg_cycle_duration": 0,
             "cycle_type": "Unknown",
-            "cycle_details": [],  # New: detailed info for each cycle
+            "cycle_details": [],
         }
 
         try:
-            # Enhanced cycle detection: consider multiple components working together
-            # Key components in the manufacturing process
+            # Pre-define component columns for faster lookup
             component_columns = {
                 "vgr": "vgr_status_code",
                 "hbw": "hbw_status_code",
@@ -393,213 +523,180 @@ class AnalyticsAgent:
                 "sld": "sld_status_code",
             }
 
-            # Find available components
-            available_components = {}
-            for comp_name, col_name in component_columns.items():
-                if col_name in factory_data.columns:
-                    available_components[comp_name] = col_name
+            # Find available components efficiently
+            available_components = {
+                comp_name: col_name 
+                for comp_name, col_name in component_columns.items()
+                if col_name in factory_data.columns
+            }
 
             if not available_components:
                 return cycle_analysis
 
-            # Create a combined activity signal considering all components
-            # Any component active (status != 1) means the process is active
-            combined_activity = pd.Series(False, index=factory_data.index)
+            # Vectorized activity detection - much faster than individual column processing
+            status_cols = list(available_components.values())
+            status_data = factory_data[status_cols]
+            
+            # Create combined activity signal using vectorized operations
+            combined_activity = (status_data != 1).any(axis=1)
 
-            for comp_name, col_name in available_components.items():
-                component_active = factory_data[col_name] != 1
-                combined_activity = combined_activity | component_active
+            # Fast transition detection using diff and boolean indexing
+            activity_changes = combined_activity.diff()
+            process_starts = factory_data.index[activity_changes & combined_activity].tolist()
 
-            # Find process start transitions with more flexible logic
-            # Option 1: Find transitions from idle to active
-            process_start_mask = (combined_activity.shift(1) == False) & (
-                combined_activity == True
-            )
+            # If no clear transitions, find continuous active periods
+            if not process_starts and combined_activity.sum() > 0:
+                process_starts = self._find_active_periods_vectorized(combined_activity, factory_data.index)
 
-            # Extract proper timestamps from the dataframe index
-            # Instead of using list() which can return positions, directly access the timestamps
-            process_start_indices = []
-            for i, is_start in enumerate(process_start_mask):
-                if is_start:
-                    process_start_indices.append(factory_data.index[i])
-
-            # If no transitions found, try alternative approach:
-            # Find continuous active periods and treat each as a cycle
-            if len(process_start_indices) == 0 and combined_activity.sum() > 0:
-                # Find all active periods
-                active_periods = []
-                in_active_period = False
-                period_start = None
-
-                for i, is_active in enumerate(combined_activity):
-                    if is_active and not in_active_period:
-                        # Start of new active period - use timestamp
-                        period_start = factory_data.index[i]
-                        in_active_period = True
-                    elif not is_active and in_active_period:
-                        # End of active period
-                        period_end = (
-                            factory_data.index[i - 1]
-                            if i > 0
-                            else factory_data.index[i]
-                        )
-                        active_periods.append((period_start, period_end))
-                        in_active_period = False
-
-                # Handle case where data ends while still active
-                if in_active_period and period_start is not None:
-                    active_periods.append((period_start, factory_data.index[-1]))
-
-                # Use active periods as cycles - use timestamps, not indices
-                if active_periods:
-                    process_start_indices = [start for start, end in active_periods]
-
-            # Verify all process start indices are timestamps
-            if process_start_indices:
-                # Ensure all indices are timestamps
-                for idx in process_start_indices:
-                    if not isinstance(idx, (pd.Timestamp, datetime)):
-                        # Convert if needed
-                        if isinstance(idx, (int, np.integer)):
-                            # Fallback conversion
-                            pass
-
-            if len(process_start_indices) == 0:
-                cycle_analysis["cycle_count"] = 0
-            else:
-                # Filter transitions that are too close together (< 1 minute)
-                # Since we have 5-second intervals, minimum cycle duration should be 1 minute
-                # 60 seconds / 5 seconds per interval = 12 intervals minimum
-
-                filtered_transitions = []
-                min_cycle_duration_intervals = (
-                    12  # 60 seconds / 5 seconds per interval (1 minute minimum)
+            # Filter close transitions efficiently (< 1 minute = 12 intervals)
+            if process_starts:
+                filtered_transitions = self._filter_close_transitions_vectorized(
+                    process_starts, factory_data.index, min_intervals=12
                 )
-
-                if process_start_indices:
-                    # Always keep the first transition
-                    filtered_transitions.append(process_start_indices[0])
-
-                    # Check subsequent transitions
-                    for i in range(1, len(process_start_indices)):
-                        current_idx = process_start_indices[i]
-                        last_kept_idx = filtered_transitions[-1]
-
-                        # Calculate time difference in intervals
-                        # Find the position of current and last indices in the dataframe
-                        current_pos = factory_data.index.get_loc(current_idx)
-                        last_pos = factory_data.index.get_loc(last_kept_idx)
-                        time_diff_intervals = current_pos - last_pos
-
-                        # Only keep this transition if it's far enough from the last one
-                        if time_diff_intervals >= min_cycle_duration_intervals:
-                            filtered_transitions.append(current_idx)
-
-                # Ensure all filtered transitions are timestamps
-                validated_filtered_transitions = []
-                for idx in filtered_transitions:
-                    if isinstance(idx, (int, np.integer)):
-                        validated_filtered_transitions.append(factory_data.index[idx])
-                    else:
-                        validated_filtered_transitions.append(idx)
-                filtered_transitions = validated_filtered_transitions
 
                 cycle_analysis["cycle_count"] = len(filtered_transitions)
 
-                # Analyze each individual cycle
-                cycle_details = []
-                for i, cycle_start in enumerate(filtered_transitions):
-                    cycle_num = i + 1
-
-                    # Determine cycle end (next cycle start or end of data)
-                    if i + 1 < len(filtered_transitions):
-                        next_cycle_start = filtered_transitions[i + 1]
-                        try:
-                            next_pos = factory_data.index.get_loc(next_cycle_start)
-                            if next_pos > 0:
-                                cycle_end = factory_data.index[next_pos - 1]
-                            else:
-                                cycle_end = next_cycle_start
-                        except KeyError:
-                            cycle_end = factory_data.index[-1]
-                    else:
-                        cycle_end = factory_data.index[-1]
-
-                    # Extract data for this specific cycle
-                    cycle_data = factory_data.loc[cycle_start:cycle_end]
-
-                    # Calculate cycle duration
-                    cycle_duration_minutes = (
-                        len(cycle_data) * 5 / 60
-                    )  # 5-second intervals
-
-                    # Determine process type for this cycle
-                    cycle_type = self._determine_cycle_type(
-                        cycle_data, available_components
+                if filtered_transitions:
+                    # Vectorized cycle analysis
+                    cycle_details = self._analyze_cycles_vectorized(
+                        filtered_transitions, factory_data, available_components
                     )
+                    cycle_analysis["cycle_details"] = cycle_details
 
-                    cycle_info = {
-                        "cycle_number": cycle_num,
-                        "duration_minutes": round(cycle_duration_minutes, 1),
-                        "process_type": cycle_type,
-                        "active_components": self._get_active_components_for_cycle(
-                            cycle_data, available_components
-                        ),
-                    }
+                    # Calculate average duration
+                    if len(filtered_transitions) > 1:
+                        total_duration_minutes = len(factory_data) * 5 / 60
+                        cycle_analysis["avg_cycle_duration"] = round(
+                            total_duration_minutes / len(filtered_transitions), 1
+                        )
+                    elif len(filtered_transitions) == 1:
+                        cycle_analysis["avg_cycle_duration"] = round(len(factory_data) * 5 / 60, 1)
 
-                    cycle_details.append(cycle_info)
-
-                cycle_analysis["cycle_details"] = cycle_details
-
-                # Calculate average cycle duration if cycles detected
-                if len(filtered_transitions) > 1:
-                    # Calculate duration based on filtered transitions
-                    total_duration_minutes = (
-                        len(factory_data) * 5 / 60
-                    )  # 5-second intervals
-                    cycle_analysis["avg_cycle_duration"] = round(
-                        total_duration_minutes / len(filtered_transitions), 1
+                    # Determine overall process type using vectorized operations
+                    cycle_analysis["cycle_type"] = self._determine_overall_process_type_vectorized(
+                        factory_data, available_components
                     )
-                elif len(filtered_transitions) == 1:
-                    # Single cycle - use total duration
-                    total_duration_minutes = len(factory_data) * 5 / 60
-                    cycle_analysis["avg_cycle_duration"] = round(
-                        total_duration_minutes, 1
-                    )
-
-                # Determine overall process type based on which components are active across all cycles
-                if cycle_analysis["cycle_count"] > 0:
-                    hbw_active = (
-                        "hbw" in available_components
-                        and (factory_data[available_components["hbw"]] != 1).any()
-                    )
-                    mpo_active = (
-                        "mpo" in available_components
-                        and (factory_data[available_components["mpo"]] != 1).any()
-                    )
-                    sld_active = (
-                        "sld" in available_components
-                        and (factory_data[available_components["sld"]] != 1).any()
-                    )
-                    vgr_active = (
-                        "vgr" in available_components
-                        and (factory_data[available_components["vgr"]] != 1).any()
-                    )
-
-                    if mpo_active or sld_active:
-                        cycle_analysis["cycle_type"] = "Production Process"
-                    elif hbw_active and vgr_active:
-                        cycle_analysis["cycle_type"] = "Storage Process"
-                    elif vgr_active:
-                        cycle_analysis["cycle_type"] = "Transfer/Movement Process"
-                    else:
-                        cycle_analysis["cycle_type"] = "Mixed/Unknown Process"
 
             return cycle_analysis
 
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"Error in cycle analysis: {e}")
             cycle_analysis["cycle_count"] = 0
             return cycle_analysis
+
+    def _find_active_periods_vectorized(self, combined_activity: pd.Series, index: pd.Index) -> List:
+        """Find active periods using vectorized operations."""
+        # Find start and end points of active periods
+        activity_diff = combined_activity.astype(int).diff()
+        starts = index[activity_diff == 1].tolist()
+        
+        # Handle case where data starts active
+        if combined_activity.iloc[0]:
+            starts.insert(0, index[0])
+            
+        return starts
+
+    def _filter_close_transitions_vectorized(self, transitions: List, index: pd.Index, min_intervals: int) -> List:
+        """Filter transitions that are too close together using vectorized operations."""
+        if not transitions:
+            return transitions
+            
+        filtered = [transitions[0]]
+        
+        # Convert to positions for faster computation
+        positions = [index.get_loc(t) for t in transitions]
+        
+        for i in range(1, len(positions)):
+            if positions[i] - positions[filtered[-1] if len(filtered) == 1 else 
+                                      index.get_loc(filtered[-1])] >= min_intervals:
+                filtered.append(transitions[i])
+                
+        return filtered
+
+    def _analyze_cycles_vectorized(self, transitions: List, factory_data: pd.DataFrame, 
+                                 available_components: Dict[str, str]) -> List[Dict[str, Any]]:
+        """Analyze individual cycles using vectorized operations."""
+        cycle_details = []
+        
+        for i, cycle_start in enumerate(transitions):
+            cycle_num = i + 1
+            
+            # Determine cycle end efficiently
+            if i + 1 < len(transitions):
+                try:
+                    next_pos = factory_data.index.get_loc(transitions[i + 1])
+                    cycle_end = factory_data.index[max(0, next_pos - 1)]
+                except (KeyError, IndexError):
+                    cycle_end = factory_data.index[-1]
+            else:
+                cycle_end = factory_data.index[-1]
+            
+            # Extract cycle data
+            cycle_data = factory_data.loc[cycle_start:cycle_end]
+            
+            # Calculate duration
+            cycle_duration_minutes = len(cycle_data) * 5 / 60
+            
+            # Vectorized component activity detection
+            active_components = []
+            process_type = "Unknown Process"
+            
+            if available_components:
+                status_cols = list(available_components.values())
+                cycle_status = cycle_data[status_cols]
+                
+                # Check which components are active in this cycle
+                for comp_name, col_name in available_components.items():
+                    if (cycle_status[col_name] != 1).any():
+                        active_components.append(comp_name.upper())
+                
+                # Determine process type based on active components
+                process_type = self._determine_cycle_type_fast(active_components)
+            
+            cycle_info = {
+                "cycle_number": cycle_num,
+                "duration_minutes": round(cycle_duration_minutes, 1),
+                "process_type": process_type,
+                "active_components": active_components,
+            }
+            
+            cycle_details.append(cycle_info)
+        
+        return cycle_details
+
+    def _determine_cycle_type_fast(self, active_components: List[str]) -> str:
+        """Fast cycle type determination using set operations."""
+        active_set = set(comp.lower() for comp in active_components)
+        
+        if {'mpo', 'sld'}.intersection(active_set):
+            return "Production Process"
+        elif {'hbw', 'vgr'}.issubset(active_set):
+            return "Storage Process"
+        elif 'vgr' in active_set:
+            return "Transfer/Movement Process"
+        else:
+            return "Unknown Process"
+
+    def _determine_overall_process_type_vectorized(self, factory_data: pd.DataFrame, 
+                                                  available_components: Dict[str, str]) -> str:
+        """Determine overall process type using vectorized operations."""
+        if not available_components:
+            return "Unknown Process"
+            
+        # Vectorized activity check for all components
+        activity_status = {}
+        for comp_name, col_name in available_components.items():
+            activity_status[comp_name] = (factory_data[col_name] != 1).any()
+        
+        # Use the same logic as cycle type determination
+        if activity_status.get('mpo', False) or activity_status.get('sld', False):
+            return "Production Process"
+        elif activity_status.get('hbw', False) and activity_status.get('vgr', False):
+            return "Storage Process"
+        elif activity_status.get('vgr', False):
+            return "Transfer/Movement Process"
+        else:
+            return "Mixed/Unknown Process"
 
     def _determine_cycle_type(
         self, cycle_data: pd.DataFrame, available_components: Dict[str, str]
@@ -741,7 +838,26 @@ class AnalyticsAgent:
         try:
             # Parse time range from query if not provided
             if time_range is None:
-                time_range = self.default_time_range
+                time_range = self.parse_time_range_from_query(query_text)
+                
+            # Check if the parsed time range is outside our historical data range
+            historical_start = datetime(2022, 12, 1)
+            historical_end = datetime(2022, 12, 31)
+            
+            if time_range[0] > historical_end or time_range[1] < historical_start:
+                # Time range is completely outside our historical data
+                start_time, end_time = time_range
+                time_range_str = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} to {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                
+                return {
+                    "error": "No data available for the requested time period.",
+                    "guidance": f"The requested time range ({time_range_str}) is outside our historical data range (December 1-31, 2022). Please specify a time period within the available data range.",
+                    "time_range_searched": time_range_str,
+                    "available_data_range": "2022-12-01 to 2022-12-31",
+                    "query": query_text,
+                    "time_range": time_range,
+                    "success": False,
+                }
 
             # Detect query type and components
             query_type = self._classify_query_type(query_text)
@@ -832,28 +948,82 @@ class AnalyticsAgent:
             }
 
     def _classify_query_type(self, query_text: str) -> str:
-        """Classify query as environmental or process analysis."""
+        """Classify query as environmental or process analysis using optimized keyword matching."""
         query_lower = query_text.lower()
 
-        # Environmental queries take priority
-        if any(
-            phrase in query_lower
-            for phrase in [
-                "environment",
-                "environmental",
-                "temperature",
-                "humidity",
-                "air",
-                "pressure",
-                "gas",
-                "quality",
-                "sensor",
-                "condition",
-            ]
-        ):
+        # Use set intersection for faster keyword matching
+        query_words = set(query_lower.split())
+        if query_words.intersection(self._ENV_KEYWORDS):
             return "environmental"
 
         return "process_analysis"
+
+    @lru_cache(maxsize=128)
+    def _detect_components_from_query_cached(self, query_text: str) -> Tuple[str, ...]:
+        """
+        Cached version of component detection for repeated queries.
+        Returns tuple for hashability in cache.
+        """
+        return tuple(self._detect_components_from_query_impl(query_text))
+
+    def _detect_components_from_query(self, query_text: str) -> List[str]:
+        """
+        Detect what components to load based on the query content.
+        Uses caching for better performance.
+        """
+        return list(self._detect_components_from_query_cached(query_text))
+
+    def _detect_components_from_query_impl(self, query_text: str) -> List[str]:
+        """
+        Implementation of component detection with optimized keyword matching.
+
+        Args:
+            query_text: The user's natural language query
+
+        Returns:
+            List of component names to load, ordered by priority
+        """
+        query_lower = query_text.lower()
+        query_words = set(query_lower.split())
+        components_to_load = []
+
+        # Environmental keywords - use set intersection for faster matching
+        env_keywords = {'environmental', 'environment', 'temperature', 'humidity', 
+                       'air', 'quality', 'pressure', 'gas', 'brightness'}
+        if query_words.intersection(env_keywords):
+            components_to_load.append("ENVIRONMENTAL")
+
+        # Specific component keywords - optimized with direct lookups
+        component_mappings = {
+            'vgr': ["VGR"],
+            'vacuum': ["VGR"],
+            'gripper': ["VGR"],
+            'hbw': ["HBW"],
+            'warehouse': ["HBW"],
+            'storage': ["HBW"],
+            'mpo': ["MPO"],
+            'processing': ["MPO"],
+            'sld': ["SLD"],
+            'sorting': ["SLD"],
+        }
+
+        for keyword, components in component_mappings.items():
+            if keyword in query_lower:
+                components_to_load.extend(components)
+
+        # Default to factory overview if no specific component mentioned
+        if not components_to_load:
+            components_to_load.append("FACTORY")
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_components = []
+        for comp in components_to_load:
+            if comp not in seen:
+                seen.add(comp)
+                unique_components.append(comp)
+
+        return unique_components
 
     def _save_chart_for_llm(self, component: str, data: pd.DataFrame) -> Optional[str]:
         """Save chart to file for LLM analysis."""
@@ -898,9 +1068,10 @@ class AnalyticsAgent:
             else:
                 return f"Based on the query '{query_text}', here's the {component_name} analysis:\n\n{data_summary}"
 
+    @lru_cache(maxsize=64)
     def parse_time_range_from_query(self, query: str) -> Tuple[datetime, datetime]:
         """
-        Parse date and time information from a natural language query.
+        Optimized time range parsing with caching and pre-compiled patterns.
 
         For relative time expressions (e.g., "last 10 minutes", "past hour"),
         this method uses the current time as reference to support future
@@ -916,29 +1087,13 @@ class AnalyticsAgent:
         """
         query_lower = query.lower()
 
-        # Handle relative time expressions first (e.g., "last 10 minutes", "past hour")
-        relative_patterns = [
-            # "last X minutes/hours/days"
-            (r"last\s+(\d+)\s+minutes?", "minutes"),
-            (r"last\s+(\d+)\s+hours?", "hours"),
-            (r"last\s+(\d+)\s+days?", "days"),
-            # "past X minutes/hours/days"
-            (r"past\s+(\d+)\s+minutes?", "minutes"),
-            (r"past\s+(\d+)\s+hours?", "hours"),
-            (r"past\s+(\d+)\s+days?", "days"),
-            # "X minutes/hours ago"
-            (r"(\d+)\s+minutes?\s+ago", "minutes"),
-            (r"(\d+)\s+hours?\s+ago", "hours"),
-            (r"(\d+)\s+days?\s+ago", "days"),
-        ]
-
-        for pattern, unit in relative_patterns:
-            match = re.search(pattern, query_lower)
+        # Handle relative time expressions using pre-compiled patterns
+        for pattern, unit in self._TIME_PATTERNS:
+            match = pattern.search(query_lower)
             if match:
                 amount = int(match.group(1))
 
                 # Use current time as reference for relative queries
-                # This allows for future integration with real-time databases
                 now = datetime.now()
 
                 if unit == "minutes":
@@ -953,102 +1108,80 @@ class AnalyticsAgent:
 
                 return (start_time, end_time)
 
-        # Handle month-day range patterns first (e.g., "december 14 to december 15")
-        month_day_pattern = r'(\w+)\s+(\d{1,2})\s+to\s+(\w+)\s+(\d{1,2})'
-        match = re.search(month_day_pattern, query_lower)
-        
+        # Handle month-day range patterns
+        month_day_pattern = re.compile(r'(\w+)\s+(\d{1,2})\s+to\s+(\w+)\s+(\d{1,2})', re.IGNORECASE)
+        match = month_day_pattern.search(query_lower)
+
         if match:
             start_month = match.group(1)
             start_day = int(match.group(2))
             end_month = match.group(3)
             end_day = int(match.group(4))
-            
-            # Map month names to numbers
+
+            # Pre-defined month mapping for better performance
             month_map = {
                 'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
                 'april': 4, 'apr': 4, 'may': 5, 'june': 6, 'jun': 6,
                 'july': 7, 'jul': 7, 'august': 8, 'aug': 8, 'september': 9, 'sep': 9,
                 'october': 10, 'oct': 10, 'november': 11, 'nov': 11, 'december': 12, 'dec': 12
             }
-            
+
             start_month_num = month_map.get(start_month)
             end_month_num = month_map.get(end_month)
-            
+
             if start_month_num and end_month_num:
                 try:
-                    # Use 2022 as the year based on available data
                     start_time = datetime(2022, start_month_num, start_day, 0, 0, 0)
                     end_time = datetime(2022, end_month_num, end_day, 23, 59, 59)
-                    
                     return (start_time, end_time)
                 except ValueError:
-                    pass  # Fall through to other patterns if date is invalid
+                    pass
 
-        # Common date patterns
-        date_patterns = [
-            # DD/MM/YYYY or D/M/YYYY formats
-            r"(\d{1,2})/(\d{1,2})/(\d{4})",
-            # YYYY-MM-DD format
-            r"(\d{4})-(\d{1,2})-(\d{1,2})",
-            # DD-MM-YYYY format
-            r"(\d{1,2})-(\d{1,2})-(\d{4})",
-            # Handle ordinal dates like "2nd december 2022"
-            r"(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)\s+(\d{4})",
-        ]
-
-        # Try to find date
+        # Use pre-compiled date patterns
         date_match = None
         date_format = None
-        for i, pattern in enumerate(date_patterns):
-            match = re.search(pattern, query_lower)
+        for i, pattern in enumerate(self._DATE_PATTERNS):
+            match = pattern.search(query_lower)
             if match:
                 date_match = match
                 date_format = i
                 break
 
         if not date_match:
-            # If no specific date found, return default
             return self.default_time_range
 
         # Parse the date based on the pattern matched
         groups = date_match.groups()
 
-        if date_format == 3:  # Ordinal date format (e.g., "2nd december 2022")
+        if date_format == 3:  # Ordinal date format "1st december 2022"
             day = int(groups[0])
             month_name = groups[1].lower()
             year = int(groups[2])
 
-            # Convert month name to number
             month_names = {
-                "january": 1,
-                "jan": 1,
-                "february": 2,
-                "feb": 2,
-                "march": 3,
-                "mar": 3,
-                "april": 4,
-                "apr": 4,
-                "may": 5,
-                "june": 6,
-                "jun": 6,
-                "july": 7,
-                "jul": 7,
-                "august": 8,
-                "aug": 8,
-                "september": 9,
-                "sep": 9,
-                "october": 10,
-                "oct": 10,
-                "november": 11,
-                "nov": 11,
-                "december": 12,
-                "dec": 12,
+                "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+                "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6,
+                "july": 7, "jul": 7, "august": 8, "aug": 8, "september": 9, "sep": 9,
+                "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
+            }
+            month = month_names.get(month_name)
+            if not month:
+                return self.default_time_range
+        elif date_format == 4:  # "december 1st 2022" format
+            month_name = groups[0].lower()
+            day = int(groups[1])
+            year = int(groups[2])
+
+            month_names = {
+                "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+                "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6,
+                "july": 7, "jul": 7, "august": 8, "aug": 8, "september": 9, "sep": 9,
+                "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
             }
             month = month_names.get(month_name)
             if not month:
                 return self.default_time_range
         elif len(groups) == 3:
-            # Check if it's DD/MM/YYYY or YYYY-MM-DD format
             if len(groups[0]) == 4:  # YYYY-MM-DD
                 year, month, day = int(groups[0]), int(groups[1]), int(groups[2])
             else:  # DD/MM/YYYY or DD-MM-YYYY
@@ -1059,93 +1192,85 @@ class AnalyticsAgent:
         try:
             base_date = datetime(year, month, day)
         except ValueError:
-            # Invalid date
             return self.default_time_range
 
-        # Look for time ranges
-        start_time = None
-        end_time = None
+        # Optimized time range parsing
+        start_time, end_time = self._parse_time_ranges_optimized(query_lower, base_date)
+        
+        if start_time and end_time:
+            return (start_time, end_time)
 
-        # Pattern for "from HH:MM to HH:MM" or "from HHpm to HH:MMpm"
+        return self.default_time_range
+
+    def _parse_time_ranges_optimized(self, query_lower: str, base_date: datetime) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """Optimized time range parsing with pre-compiled patterns."""
+        # Pre-compiled time range patterns with more comprehensive coverage
         time_range_patterns = [
-            r"from\s+(\d{1,2}):(\d{2})\s+to\s+(\d{1,2}):(\d{2})",
-            r"from\s+(\d{1,2})(?::(\d{2}))?\s*pm\s+to\s+(\d{1,2}):(\d{2})\s*pm",
-            r"from\s+(\d{1,2})\s*pm\s+to\s+(\d{1,2}):(\d{2})\s*pm",
+            # Standard "from HH:MM to HH:MM" format (24-hour)
+            re.compile(r"from\s+(\d{1,2}):(\d{2})\s+to\s+(\d{1,2}):(\d{2})"),
+            # Alternative "HH:MM to HH:MM" format
+            re.compile(r"(\d{1,2}):(\d{2})\s+to\s+(\d{1,2}):(\d{2})"),
+            # "between HH:MM and HH:MM" format
+            re.compile(r"between\s+(\d{1,2}):(\d{2})\s+and\s+(\d{1,2}):(\d{2})"),
+            # PM patterns
+            re.compile(r"from\s+(\d{1,2})(?::(\d{2}))?\s*pm\s+to\s+(\d{1,2}):(\d{2})\s*pm"),
+            re.compile(r"from\s+(\d{1,2})\s*pm\s+to\s+(\d{1,2}):(\d{2})\s*pm"),
         ]
 
-        for pattern in time_range_patterns:
-            time_range_match = re.search(pattern, query_lower)
+        for i, pattern in enumerate(time_range_patterns):
+            time_range_match = pattern.search(query_lower)
             if time_range_match:
                 groups = time_range_match.groups()
 
-                if pattern.endswith("pm"):
-                    # Handle PM times
-                    if (
-                        len(groups) == 4 and groups[1] is not None
-                    ):  # HH:MM pm to HH:MM pm
+                if i >= 3:  # PM patterns (indices 3+)
+                    if len(groups) == 4 and groups[1] is not None:
                         start_hour, start_min, end_hour, end_min = map(int, groups)
                         if start_hour < 12:
                             start_hour += 12
                         if end_hour < 12:
                             end_hour += 12
-                    elif len(groups) == 3:  # H pm to HH:MM pm
-                        start_hour, end_hour, end_min = (
-                            int(groups[0]),
-                            int(groups[1]),
-                            int(groups[2]),
-                        )
+                    elif len(groups) == 3:
+                        start_hour, end_hour, end_min = int(groups[0]), int(groups[1]), int(groups[2])
                         start_min = 0
                         if start_hour < 12:
                             start_hour += 12
                         if end_hour < 12:
                             end_hour += 12
                     else:
-                        continue  # Skip this pattern if groups don't match expected format
-                else:
-                    # Regular 24-hour format
+                        continue
+                else:  # 24-hour format patterns (indices 0-2)
                     if len(groups) == 4:
                         start_hour, start_min, end_hour, end_min = map(int, groups)
                     else:
-                        continue  # Skip this pattern if groups don't match expected format
+                        continue
 
-                start_time = base_date.replace(
-                    hour=start_hour, minute=start_min, second=0
-                )
+                start_time = base_date.replace(hour=start_hour, minute=start_min, second=0)
                 end_time = base_date.replace(hour=end_hour, minute=end_min, second=0)
-                break
+                return start_time, end_time
 
-        if not start_time:
-            # Pattern for "at HH:MM" - use 30 minute window
-            at_time_match = re.search(r"at\s+(\d{1,2}):(\d{2})", query_lower)
-            if at_time_match:
-                hour, minute = map(int, at_time_match.groups())
-                start_time = base_date.replace(hour=hour, minute=minute, second=0)
-                end_time = start_time + timedelta(minutes=30)
-            else:
-                # Look for individual times and try to infer range
-                times_found = []
-                for match in re.finditer(r"(\d{1,2}):(\d{2})", query):
-                    hour, minute = int(match.group(1)), int(match.group(2))
-                    times_found.append(
-                        base_date.replace(hour=hour, minute=minute, second=0)
-                    )
+        # Handle "at HH:MM" pattern
+        at_time_pattern = re.compile(r"at\s+(\d{1,2}):(\d{2})")
+        at_time_match = at_time_pattern.search(query_lower)
+        if at_time_match:
+            hour, minute = map(int, at_time_match.groups())
+            start_time = base_date.replace(hour=hour, minute=minute, second=0)
+            end_time = start_time + timedelta(minutes=30)
+            return start_time, end_time
 
-                if len(times_found) >= 2:
-                    start_time = min(times_found)
-                    end_time = max(times_found)
-                elif len(times_found) == 1:
-                    # Single time, use 1 hour window
-                    start_time = times_found[0]
-                    end_time = start_time + timedelta(hours=1)
-                else:
-                    # No specific time found, use the whole day
-                    start_time = base_date
-                    end_time = base_date + timedelta(days=1)
+        # Handle individual times
+        time_pattern = re.compile(r"(\d{1,2}):(\d{2})")
+        times_found = []
+        for match in time_pattern.finditer(query_lower):
+            hour, minute = int(match.group(1)), int(match.group(2))
+            times_found.append(base_date.replace(hour=hour, minute=minute, second=0))
 
-        if start_time and end_time:
-            return (start_time, end_time)
-
-        return self.default_time_range
+        if len(times_found) >= 2:
+            return min(times_found), max(times_found)
+        elif len(times_found) == 1:
+            return times_found[0], times_found[0] + timedelta(hours=1)
+        else:
+            # No specific time found, use the whole day
+            return base_date, base_date + timedelta(days=1)
 
     def _detect_components_from_query(self, query_text: str) -> List[str]:
         """

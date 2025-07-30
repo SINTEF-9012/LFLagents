@@ -1,12 +1,21 @@
-import streamlit as st
+"""
+Streamlit application for SINTEF Manufacturing Intelligence Dashboard.
+
+This application provides a comprehensive interface for interacting with
+manufacturing data through multiple AI agents including retrieval, monitoring,
+analytics, and integrated manufacturing capabilities.
+"""
+
 import os
 import sys
-from datetime import datetime
 import json
+from datetime import datetime
+import streamlit as st
 
 # Add the src directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Import agents
 from agents.integrated_agent import IntegratedManufacturingAgent
 from agents.monitoring_agent import MonitoringAgent
 from agents.retriever_agent import RetrieverAgent
@@ -19,12 +28,16 @@ from utils.llm_image_explanation import (
     generate_comprehensive_process_explanation,
 )
 
-# Import visualization functions at top-level to avoid pylint C0415
-from viz import (
-    visualize_component_activity,
-    visualize_factory_overview,
-    visualize_environmental_data,
-)
+
+def json_serialize_helper(obj):
+    """Helper function to serialize objects for JSON export."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, (bool, int, float, str, list, dict, type(None))):
+        return obj
+    elif hasattr(obj, '__dict__'):
+        return str(obj)
+    return str(obj)
 
 
 # Page configuration
@@ -169,22 +182,24 @@ def process_query(query, progress_container=None):
             response = agent.query(query)
             response_time = (datetime.now() - start_time).total_seconds()
 
-            # Check if a chart can be generated for this query
+            # Check if a chart can be generated for this query - only if analytics is needed
             chart_figure = None
-            try:
-                # Parse time range from query for consistent chart generation
-                time_range = agent.analytics_agent.parse_time_range_from_query(query)
-                chart_figure = agent.analytics_agent.get_interactive_chart(
-                    query, time_range
-                )
-            except Exception as e:
-                print(f"Error generating chart from analytics agent: {e}")
-                chart_figure = None
+            classification = agent.classify_query_type(query)
+            if classification.get('AnalyticsAgent', False):
+                try:
+                    # Parse time range from query for consistent chart generation
+                    time_range = agent.analytics_agent.parse_time_range_from_query(query)
+                    chart_figure = agent.analytics_agent.get_interactive_chart(
+                        query, time_range
+                    )
+                except Exception as e:
+                    print(f"Error generating chart from analytics agent: {e}")
+                    chart_figure = None
 
             metadata = {
                 "agent_type": "integrated",
                 "timestamp": datetime.now().isoformat(),
-                "query_classification": agent.classify_query_type(query),
+                "query_classification": classification,
                 "response_time_sec": response_time,
                 "chart_generated": chart_figure is not None,
             }
@@ -475,6 +490,7 @@ def display_analytics_dashboard():
         except Exception as e:
             st.error(f"Error displaying metrics: {str(e)}")
 
+        # Import visualization functions directly from viz.py
         try:
             # Check if we have data loaded in the session state
             if (
@@ -482,6 +498,13 @@ def display_analytics_dashboard():
                 and selected_component in st.session_state.component_data
             ):
                 component_data = st.session_state.component_data[selected_component]
+
+                # Import visualization functions directly from viz.py
+                from viz import (
+                    visualize_component_activity,
+                    visualize_factory_overview,
+                    visualize_environmental_data,
+                )
 
                 # Create appropriate visualization based on component type
                 if selected_component == "FACTORY":
@@ -830,7 +853,13 @@ def main():
 
         # Export chat history
         if st.session_state.chat_history and st.button("💾 Export Chat"):
-            chat_data = json.dumps(st.session_state.chat_history, indent=2)
+            try:
+                chat_data = json.dumps(st.session_state.chat_history, indent=2, default=json_serialize_helper)
+            except Exception as e:
+                # Fallback: convert to string if JSON serialization fails
+                chat_data = str(st.session_state.chat_history)
+                st.warning(f"JSON serialization failed, exporting as string: {e}")
+            
             st.download_button(
                 "Download Chat History",
                 chat_data,
