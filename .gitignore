@@ -135,3 +135,6 @@ factory_data/
 
 # Chat History
 chat_history/
+
+# Generated files
+generated_charts/

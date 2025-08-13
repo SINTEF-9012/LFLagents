@@ -6,7 +6,7 @@ if __name__ == "__main__":
     connection = load_mqtt_config(os.path.join(os.path.dirname(__file__), 'config/connections.json'))
     query_post_api('kg/connection', connection)
     print(f"Registered Connection: {connection['uri']}")
-    
+
     # 1.1 Store connection secret in Vault
     query_post_vault_mqtt_pass()
     print("Stored MQTT broker password in Vault")
