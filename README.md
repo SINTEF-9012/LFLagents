@@ -8,7 +8,7 @@ Learning Feedback Loop agent-based approach is a multi-agent framework to assist
 
 - Recommendation Module: (Real-time) manufacturing process reconfiguration suggestions may be made by using AI agents to automatically produce feedback and recommendations based on data analysis and trend indicators.
 
-Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and large language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, the Analytics Agent provides semantic insights and interprets charts from historical sensor data by computing relevant metrics and detecting patterns. Finally, we have been developing an integrated agent approach, combining the strengths of the RetrieverAgent, the MonitoringAgent and the AnalyticsAgent into the Integrated Agent to provide a unified interface for factory information retrieval, real-time monitoring and time-series analytics within a single interactive agent framework.
+Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and large language models (LLMs) to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, we have been developing an integrated agent approach, combining the strengths of both the RetrieverAgent and the MonitoringAgent into the Integrated Agent to provide a unified interface for factory information retrieval and real-time monitoring.
 
 ## Getting Started
 
@@ -47,8 +47,7 @@ NEO4J_APOC_IMPORT_FILE_ENABLED=true
 NEO4J_APOC_IMPORT_FILE_USE_NEO4J_CONFIG=true
 NEO4J_PLUGINS=["apoc", "graph-data-science"]
 
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key
+# LLMs Config
 CHAT_MODEL = "gpt-4o"
 EMBEDDING_MODEL = "text-embedding-3-small"
 ```
@@ -134,7 +133,7 @@ Multilingual Embedding → Neo4j Graph & Unified Vector Index → Source-Filtere
 
 6. **Create Unified Neo4j Vector Index**:
    - Single vector index supporting all use cases with source-based filtering
-   - Uses HuggingFace multilingual embeddings instead of OpenAI embeddings
+   - Uses HuggingFace multilingual embeddings `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
    - Functions: `create_vector_index("documents")`, `update_vector_index("documents")`
 
 **To construct the Neo4j graph from multiple use cases, run:**
@@ -180,17 +179,17 @@ This script processes PDF files in the `manual` folder (organized by UC1, UC2 su
 
 ### 2. Retrieval Augmented Generation (RAG) with RetrieverAgent
 
-The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
+The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database tools and LLM to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
 
  - `Neo4jVectorTool`
    - Performs similarity-based retrieval from the `Neo4jVector` index.
    - Retrieves the most relevant documents based on the user's query.
  - `Neo4jCypherTool`
    - Executes Cypher queries to retrieve structured knowledge from the Neo4j graph.
-   - Generates Cypher statements using OpenAI's language model
+   - Generates Cypher statements using LLM
  - `RetrieverAgent`
    - Combines the results from both tools to provide a comprehensive answer to user queries.
-   - Uses OpenAI's chat models to generate responses by integrating results from both tools.
+   - Uses LLM's chat models to generate responses by integrating results from both tools.
    - Maintains chat history using Streamlit's session state and a conversation buffer.
    - Prompt Engineering:
      - The system prompt guides the assistant to provide concise, accurate, and relevant responses.
@@ -267,6 +266,7 @@ The AnalyticsAgent provides comprehensive historical data analysis, visualizatio
 
 - **LLM-Powered Insights**: Generates comprehensive process explanations using multimodal chart analysis
   
+
 1. Time Series Loading: Load resampled component data
    - File: `src/utils/ts_preprocessing.py`
    - Function: `load_resampled_requested_components()`
@@ -289,7 +289,7 @@ The AnalyticsAgent provides comprehensive historical data analysis, visualizatio
 ## Part 4: Integrated Agent
 
 The Integrated Agent provides a unified interface for factory information retrieval, real-time monitoring, and advanced analytics by orchestrating multiple specialized agents:
-  - `RetrieverAgent`: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
+  - `RetrieverAgent`: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and LLM. It is optimized for answering questions about factory structure, documentation, and historical data.
   - `MonitoringAgent`: Focuses on real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
   - `AnalyticsAgent`: Powers historical data analysis, visualization, and AI-driven insights. It supports natural language queries for time series analysis, process cycle detection, and component activity evaluation, leveraging multimodal LLMs for comprehensive process explanations.
 
@@ -297,7 +297,7 @@ The Integrated Agent provides a unified interface for factory information retrie
 ## Result
 
 The demo highlights the full capabilities of the multi-agent manufacturing assistant system within a Streamlit application. Users can interact with the following agents:
-   - `RetrieverAgent`: Provides knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models.
+   - `RetrieverAgent`: Provides knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and LLMs.
    - `MonitoringAgent`: Offers real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
    - `AnalyticsAgent`: Delivers historical data analysis, visualization, and AI-driven insights. It supports natural language queries for time series analysis, process cycle detection, and component activity evaluation, leveraging multimodal LLMs for comprehensive process explanations.
    - `IntegratedAgent`: Combines the functionalities of the above agents to provide a seamless user experience for factory information retrieval, real-time monitoring, and advanced analytics.
