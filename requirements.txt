@@ -3,7 +3,13 @@ neo4j
 langchain-community
 langchain_experimental
 langchain_openai
+langchain-ollama  # For Ollama integration
+sentence-transformers  # For multilingual embeddings
+langdetect  # For language detection
 streamlit
 streamlit_chat
 streamlit_extras
 python-dotenv
+paho-mqtt
+plotly
+kaleido
