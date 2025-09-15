@@ -1,4 +1,5 @@
 # LFLagents
+
 Learning Feedback Loop agent-based approach is a multi-agent framework to assist users in retrieving information and monitoring the factory status. Three main components of the framework are being constructed: 
 
 - Generative AI and LLMs-based Analysis Module: Collect real-time and historical data from the Sensors and IoT Devices in the manufacturing process as well as gather insights and observations from operators through visual interfaces and plain language inputs (using GUIs). This module analyzes trends and processes real-time and historical data to help guide decisions.
@@ -7,7 +8,7 @@ Learning Feedback Loop agent-based approach is a multi-agent framework to assist
 
 - Recommendation Module: (Real-time) manufacturing process reconfiguration suggestions may be made by using AI agents to automatically produce feedback and recommendations based on data analysis and trend indicators.
 
-Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, the Analytics Agent provides semantic insights and interprets charts from historical sensor data by computing relevant metrics and detecting patterns. Finally, we have been developing an integrated agent approach, combining the strengths of the RetrieverAgent, the MonitoringAgent and the AnalyticsAgent into the Integrated Agent to provide a unified interface for factory information retrieval, real-time monitoring and time-series analytics within a single interactive agent framework.
+Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and large language models (LLMs) to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, we have been developing an integrated agent approach, combining the strengths of both the RetrieverAgent and the MonitoringAgent into the Integrated Agent to provide a unified interface for factory information retrieval and real-time monitoring.
 
 ## Getting Started
 
@@ -46,85 +47,125 @@ NEO4J_APOC_IMPORT_FILE_ENABLED=true
 NEO4J_APOC_IMPORT_FILE_USE_NEO4J_CONFIG=true
 NEO4J_PLUGINS=["apoc", "graph-data-science"]
 
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key
+# LLMs Config
 CHAT_MODEL = "gpt-4o"
 EMBEDDING_MODEL = "text-embedding-3-small"
 ```
 
-## Use Case 1: Manufacturing Running Example - Fischertechnik Factory
+## Overview
 
-![Factory](images/factory.png)
+In this project we develop a multi-agent system that can be applied to multiple manufacturing domains to assist users in retrieving information, monitoring factory status, and analyzing manufacturing data. **The platform is designed to be extensible and can be applied to multiple use cases** by processing different document collections and configuring source-specific filters.
 
-The Fischertechnik factory model incorporates a set of core assets that replicate main components in modern manufacturing system. There are 6 main components of the factory: Deliver and Pick-up Station (DPS), Environmental station with surveillance camera (SSC),Vacuum Gripper Robot (VGR), Automated High-bay Warehouse (HBW), Multi-Processing Station with klin (MPO) and Sorting Line with Color Detection (SLD).
+### Use Cases
 
-![Factory Components](images/factory_components.png)
+The system currently supports multiple use cases through source-based document filtering:
 
-### Part 1: Retriever Agent
+- **UC1 (Use Case 1) - Fischertechnik Training Factory**: Contains factory manuals and documentation for the educational manufacturing system used for training and simulation purposes. This includes documentation for the 6 main components: Deliver and Pick-up Station (DPS), Environmental station with surveillance camera (SSC), Vacuum Gripper Robot (VGR), Automated High-bay Warehouse (HBW), Multi-Processing Station with klin (MPO) and Sorting Line with Color Detection (SLD).
+
+- **UC2 (Use Case 2) - Industrial Milling Machines (Machining Centers)**: Contains detailed technical documentation and machine manuals in Spanish for advanced industrial machining centers, including:
+  - **PMG-14000 (2019)**: Gantry-type machining center (centro de mecanizado de pórtico móvil)
+  - **FLP-14000 (2020)**: Moving-column milling center (centro de mecanizado de columna móvil) 
+  - **PM-10000 (2021)**: Next-generation milling center, part of SORALUCE's latest machining center line
+
+- **Extensible Design**: The platform can easily accommodate additional use cases (UC3, UC4, etc.) by adding new document collections with appropriate source labels for different manufacturing domains
+
+The **multilingual capabilities** enable cross-language retrieval, allowing users to query Spanish technical documentation (UC2) using English queries, and vice versa, through advanced multilingual embeddings.
+
+<!-- ![Factory](images/factory.png)
+
+*UC1: Fischertechnik Training Factory - 6 main components: Deliver and Pick-up Station (DPS), Environmental station with surveillance camera (SSC), Vacuum Gripper Robot (VGR), Automated High-bay Warehouse (HBW), Multi-Processing Station with klin (MPO) and Sorting Line with Color Detection (SLD).*
+
+![Factory Components](images/factory_components.png) -->
+
+## Part 1: Retriever Agent
 
 The RetrieverAgent handles factory documentation retrieval using a sophisticated knowledge graph approach. It combines structured and unstructured data to provide comprehensive answers to user queries.
 
 ![RA](images/toy_factory_ra_implementation.png)
 
 
-#### 1. Neo4j DB construction
+### 1. Neo4j DB construction
 
-This process involves constructing a Neo4j graph and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The graph extracts nodes and relationships from the text chunks of the PDF files. The source documents are stored in the graph and marked with the `document` node label. These `document` nodes are then used to create the Neo4j Vector Index, enabling efficient retrieval and augmentation of information from the graph database.
+This process now uses a robust, multilingual pipeline to construct a Neo4j knowledge graph and unified Neo4j Vector Index from unstructured data across multiple use cases (UC1, UC2, etc.). The enhanced pipeline includes:
 
-1. Load and Chunk PDF Files:
-   - PDF files are loaded and split into smaller chunks for easier processing.
+**Key Features:**
+- **Multi-Use Case Support**: Processes documents from different sources (UC1, UC2) with source-based filtering
+- **Blank Page Filtering**: Automatically skips pages with only headers/footers or blank page indicators (e.g., "PÁGINA INTENCIONADAMENTE EN BLANCO"), improving data quality and processing efficiency
+- **Semantic Chunking**: Uses natural text boundaries for context-aware chunking, preserving semantic meaning for better retrieval and graph extraction
+- **Multilingual Embeddings**: Employs HuggingFace sentence-transformers for cross-language retrieval (e.g., English queries on Spanish UC2 documents)
+- **Unified Vector Index**: All use cases indexed in a single vector space with `source` property filtering (UC1, UC2, etc.)
+- **Consistent Source Labeling**: Standardized `source` property across all nodes and relationships for seamless filtering
+
+<!-- **Enhanced Pipeline Flow:**
+```
+Multiple PDFs (UC1/UC2) → Blank Page Filter → Semantic Chunking → Language Detection → 
+Multilingual Embedding → Neo4j Graph & Unified Vector Index → Source-Filtered Query/Retrieval
+``` -->
+
+**Procedure:**
+
+1. **Load and Process PDFs by Use Case**:
+   - PDF files are organized by subdirectories (UC1, UC2) and processed with blank page filtering
    - File: `src/utils/pdf_processing.py`
-   - Function: `load_and_chunk_pdf(folder_path: str)`
+   - Function: `process_subdirectories_individually()` - processes each use case separately
+   - Function: `load_and_chunk_pdf()` - includes `is_blank_page()` filtering and semantic chunking
 
-2. Neo4j Graph Connection:
-   - A connection to the Neo4j database is established.
+2. **Neo4j Graph Connection with Multilingual Support**:
+   - Enhanced connection supporting multilingual embeddings and source filtering
    - File: `src/utils/neo4j_connection.py`
-   - Class: `Neo4jGraph`
-   - Functions:
-     - `add_graph_documents(graph_documents)`
-     - `clean_graph()`
+   - Functions: `load_vector_index(source_filter="uc1")`, `create_vector_index()`, `update_vector_index()`
 
-3. Graph Modeling and Mapping: 
-   - The extracted nodes and relationships are modeled and mapped to base types for compatibility with Neo4j.
-   - File: `src/utils/graph_modeling.py` and `src/utils/graph_mapping.py`
-   - Classes
-     - `Property`
-     - `Node`
-     - `Relationship`
-     - `KnowledgeGraph`
-     - *Notes: as OpenAI functions don't currently support a dictionary object as a value, we have to overwritten the properties value to be a list of Property classes instead of a dictionary. Then we combine the nodes and relationships in a single class called KnowledgeGraph.*
-   - Functions: 
-     - `format_property_keys(str)`
-     - `props_to_dict(props)`
-     - `map_to_base_node(node)`
-     - `map_to_base_relationship(rel)`
+3. **Graph Modeling and Source Labeling**: 
+   - Maintains compatibility with Neo4j while adding source-specific metadata
+   - Files: `src/utils/graph_modeling.py` and `src/utils/graph_mapping.py`
+   - Enhanced with consistent `source` property assignment for filtering
 
-4. Extract Graph Data:
-   - Each chunk of text is analyzed to extract nodes and relationships using `GPT_MODEL` (configured in `.env`).
+4. **Extract Graph Data with Language Detection**:
+   - Each chunk analyzed with automatic language detection and source labeling
    - File: `src/utils/graph_transformer.py`
-   - Function: `extract_and_store_graph(document, nodes, rels)`
-     - Modify: stores the `source` document and links it to nodes in the graph using the MENTIONS relationship.
+   - Function: `extract_and_store_graph(document, nodes, rels, source_label)`
+   - Features: Language detection, blank page skipping, source property assignment
 
-5. Store Graph Data:
-   - The extracted nodes and relationships are stored in the Neo4j database.
-   - File: `src/transform_manual_file_to_graph.py`
-   - Function: `process_pdf_file(file_path: str`
-   - Description: Orchestrates the entire process of loading PDFs, extracting graph data, and storing it in Neo4j.
+5. **Store Graph Data with Use Case Organization**:
+   - Orchestrates processing across multiple use cases with unified storage
+   - File: `src/transform_manual_file_to_neo4jdb.py`
+   - Function: `process_subdirectories_with_separate_graphs()`
 
-6. Create Neo4j Vector Index:
-   - After storing the graph data, a Neo4j Vector Index is created and updated for efficient similarity search and retrieval. The index is built using OpenAI's embedding model (text-embedding-3-small) and applied to the Document nodes in the graph.
-   - File: `src/utils/neo4j_connection.py`
-   - Function:
-     - `create_vector_index()`: Creates the vector index for `Document` nodes if it does not already exist.
-     - `update_vector_index()`: Updates the vector index by embedding the text property of Document nodes and storing the embeddings in the embedding property.
+6. **Create Unified Neo4j Vector Index**:
+   - Single vector index supporting all use cases with source-based filtering
+   - Uses HuggingFace multilingual embeddings `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
+   - Functions: `create_vector_index("documents")`, `update_vector_index("documents")`
 
-To construct the Neo4j graph from unstructured data, run the following command:
+**To construct the Neo4j graph from multiple use cases, run:**
 
-```python
-python src/transform_manual_file_to_graph.py
+```bash
+python src/transform_manual_file_to_neo4jdb.py
 ```
 
-This script processes the PDF files in the `manual` folder, extracts graph data, and stores it in the Neo4j database.
+This script processes PDF files in the `manual` folder (organized by UC1, UC2 subdirectories), applies blank page filtering and semantic chunking, extracts graph data with language detection, and stores everything in a unified Neo4j database with multilingual vector index.
+
+**Query Examples by Use Case:**
+```python
+# Query UC1 documents
+from utils.vector_search_examples import search_uc1_documents
+results = search_uc1_documents("maintenance instructions")
+
+# Query UC2 documents (English query on Spanish docs)
+from utils.vector_search_examples import search_uc2_documents  
+results = search_uc2_documents("How to operate the machine?")
+
+# Query all use cases
+from utils.vector_search_examples import search_all_documents
+results = search_all_documents("safety procedures")
+```
+
+**To construct the Neo4j graph from multiple use cases, run:**
+
+```bash
+python src/transform_manual_file_to_neo4jdb.py
+```
+
+This script processes PDF files in the `manual` folder (organized by UC1, UC2 subdirectories), applies blank page filtering and semantic chunking, extracts graph data with language detection, and stores everything in a unified Neo4j database with multilingual vector index.
 
 ![Graph by LLMs](images/KG_graph_from_text.png)
 <p align="center">
@@ -136,19 +177,19 @@ This script processes the PDF files in the `manual` folder, extracts graph data,
    <em>Snapshot of KG with explicit links between structured information and unstructured text</em>
 </p>
 
-#### 2. Retrieval Augmented Generation (RAG) with RetrieverAgent
+### 2. Retrieval Augmented Generation (RAG) with RetrieverAgent
 
-The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database tools and OpenAI's language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
+The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database tools and LLM to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively.
 
  - `Neo4jVectorTool`
    - Performs similarity-based retrieval from the `Neo4jVector` index.
    - Retrieves the most relevant documents based on the user's query.
  - `Neo4jCypherTool`
    - Executes Cypher queries to retrieve structured knowledge from the Neo4j graph.
-   - Generates Cypher statements using OpenAI's language model
+   - Generates Cypher statements using LLM
  - `RetrieverAgent`
    - Combines the results from both tools to provide a comprehensive answer to user queries.
-   - Uses OpenAI's chat models to generate responses by integrating results from both tools.
+   - Uses LLM's chat models to generate responses by integrating results from both tools.
    - Maintains chat history using Streamlit's session state and a conversation buffer.
    - Prompt Engineering:
      - The system prompt guides the assistant to provide concise, accurate, and relevant responses.
@@ -157,14 +198,14 @@ The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database t
        - IoT Gateway, Node-RED dashboards, and cloud integration.
        - Programming tasks, system setup, and educational simulations.
 
-### Part 2: Monitoring Agent
+## Part 2: Monitoring Agent
 
 The MonitoringAgent provides real-time monitoring capabilities by interfacing with the SINDIT Knowledge Graph-based Digital Twin framework.
 
 ![MA](images/toy_factory_ma_implementation.png)
 
 
-#### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
+### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
 
 SINDIT is structured according to the reference architecture for digital twin (DT) systems developed in the COGNIMAN project. It enhances flexibility and modularity through interfaces that connect different components for building knowledge graph-based DTs. See the [SINDIT documentation](https://github.com/SINTEF-9012/SINDIT20) to set up the framework.
 
@@ -202,7 +243,7 @@ This script streamlines the process of registering MQTT connections, streaming p
   <em>Result: Snapshot of the SINDIT graph created for the Fischertechnik factorys</em>
 </p>
 
-#### 2. Monitoring Agent Architecture
+### 2. Monitoring Agent Architecture
 
 The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-time monitoring and analysis of manufacturing data by interfacing with the SINDIT Knowledge Graph API. Below is an overview of its main components and functionalities:
   - `SINDITDataTool`: A custom tool that classifies user queries, determines relevant manufacturing assets (e.g., VGR, HBW, sensors), and retrieves real-time data from the SINDIT API. It maps natural language queries to specific asset URIs and fetches associated data, including sensor readings and connection status.
@@ -211,12 +252,21 @@ The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-ti
   - `query`: The main entry point for user queries. It retrieves real-time data, formats it with the original query, and generates a comprehensive response using the LLM conversation chain.
   - `get_sindit_status`: Fetches the connection status of MQTT connections from the SINDIT Knowledge Graph API.
 
-### Part 3: AnalyticsAgent
+## Part 3: AnalyticsAgent
 
-The Analytics Agent provides comprehensive historical data analysis, visualization, and LLM-powered insights for manufacturing processes. It includes advanced analytics such as process cycle detection, component activity calculation, position movement analysis, and environmental condition monitoring. Additionally, it generates comprehensive process explanations using multimodal chart analysis.
+The AnalyticsAgent provides comprehensive historical data analysis, visualization, and LLM-powered insights for manufacturing processes.
 
 ![AA](images/toy_factory_aa_implementation.png)
+
+- **Advanced Analytics**:
+  - Process cycle detection
+  - Component activity calculation
+  - Position movement analysis
+  - Environmental condition monitoring
+
+- **LLM-Powered Insights**: Generates comprehensive process explanations using multimodal chart analysis
   
+
 1. Time Series Loading: Load resampled component data
    - File: `src/utils/ts_preprocessing.py`
    - Function: `load_resampled_requested_components()`
@@ -236,18 +286,18 @@ The Analytics Agent provides comprehensive historical data analysis, visualizati
        - Position movement analysis
        - Environmental condition monitoring
 
-### Part 4: Integrated Agent
+## Part 4: Integrated Agent
 
 The Integrated Agent provides a unified interface for factory information retrieval, real-time monitoring, and advanced analytics by orchestrating multiple specialized agents:
-  - `RetrieverAgent`: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models. It is optimized for answering questions about factory structure, documentation, and historical data.
+  - `RetrieverAgent`: Handles knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and LLM. It is optimized for answering questions about factory structure, documentation, and historical data.
   - `MonitoringAgent`: Focuses on real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
   - `AnalyticsAgent`: Powers historical data analysis, visualization, and AI-driven insights. It supports natural language queries for time series analysis, process cycle detection, and component activity evaluation, leveraging multimodal LLMs for comprehensive process explanations.
 
 
-### Result
+## Result
 
 The demo highlights the full capabilities of the multi-agent manufacturing assistant system within a Streamlit application. Users can interact with the following agents:
-   - `RetrieverAgent`: Provides knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and OpenAI models.
+   - `RetrieverAgent`: Provides knowledge retrieval, question answering, and context augmentation using the Neo4j knowledge graph and LLMs.
    - `MonitoringAgent`: Offers real-time data monitoring, sensor status, and operational insights by interfacing with the SINDIT Knowledge Graph API.
    - `AnalyticsAgent`: Delivers historical data analysis, visualization, and AI-driven insights. It supports natural language queries for time series analysis, process cycle detection, and component activity evaluation, leveraging multimodal LLMs for comprehensive process explanations.
    - `IntegratedAgent`: Combines the functionalities of the above agents to provide a seamless user experience for factory information retrieval, real-time monitoring, and advanced analytics.

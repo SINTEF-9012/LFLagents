@@ -10,11 +10,7 @@ import base64
 import os
 from typing import Dict
 
-from langchain_openai import ChatOpenAI
-
-# Load environment variables
-CHAT_MODEL = os.getenv("CHAT_MODEL")
-TEMPERATURE = os.getenv("TEMPERATURE")
+from utils.llm_config import get_llm_instance
 
 
 class LLMImageAnalyzer:
@@ -23,7 +19,6 @@ class LLMImageAnalyzer:
     """
 
     # Constants
-    DEFAULT_MODEL = CHAT_MODEL
     DEFAULT_TEMPERATURE = 0.3  # Slightly higher for more creative analysis
     DEFAULT_MAX_TOKENS = 2000  # Increased for more detailed analysis
 
@@ -57,7 +52,7 @@ class LLMImageAnalyzer:
 
     def __init__(
         self,
-        model: str = DEFAULT_MODEL,
+        model: str = None,
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
     ):
@@ -65,15 +60,15 @@ class LLMImageAnalyzer:
         Initialize the LLM image analyzer.
 
         Args:
-            model: The LLM model to use
+            model: The LLM model to use (if None, uses CHAT_MODEL from env)
             temperature: Temperature for response generation
             max_tokens: Maximum tokens in response
         """
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.llm = ChatOpenAI(
-            model=model, temperature=temperature, max_tokens=max_tokens
+        self.llm = get_llm_instance(
+            model_name=model, temperature=temperature, max_tokens=max_tokens
         )
 
     def _read_image_as_base64(self, image_path: str) -> str:
