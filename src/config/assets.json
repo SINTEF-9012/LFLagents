@@ -12,19 +12,19 @@
         "uri": "http://sindit.sintef.no/2.0#humidity"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#AirQualityScore"
+        "uri": "http://sindit.sintef.no/2.0#air-quality-score"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#IndexAirQuality"
+        "uri": "http://sindit.sintef.no/2.0#index-air-quality"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#AirPressure"
+        "uri": "http://sindit.sintef.no/2.0#air-pressure"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#GasResistance"
+        "uri": "http://sindit.sintef.no/2.0#gas-resistance"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#Brightness"
+        "uri": "http://sindit.sintef.no/2.0#brightness"
       },
       {
         "uri": "http://sindit.sintef.no/2.0#LDR"
@@ -38,13 +38,13 @@
     "assetDescription": "Collection of the camera data including Camera Picture and Pan-Tilt-Unit",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#CameraData"
+        "uri": "http://sindit.sintef.no/2.0#camera-data"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#CameraPosPan"
+        "uri": "http://sindit.sintef.no/2.0#camera-pos-pan"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#CameraPosTilt"
+        "uri": "http://sindit.sintef.no/2.0#camera-pos-tilt"
       }
     ]
   },
@@ -55,16 +55,16 @@
     "assetDescription": "Collection of the order data including OrderState, OrderType and OrderLatestType",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#OrderState"
+        "uri": "http://sindit.sintef.no/2.0#order-state"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#OrderType"
+        "uri": "http://sindit.sintef.no/2.0#order-type"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#OrderLatestType"
+        "uri": "http://sindit.sintef.no/2.0#order-latest-type"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#Stock"
+        "uri": "http://sindit.sintef.no/2.0#stock"
       }
     ]
   },
@@ -75,16 +75,16 @@
     "assetDescription": "Collection of the data from the sorting line (sld)",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#sldStation"
+        "uri": "http://sindit.sintef.no/2.0#sld-station"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#sldCode"
+        "uri": "http://sindit.sintef.no/2.0#sld-code"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#sldActive"
+        "uri": "http://sindit.sintef.no/2.0#sld-active"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#sldTarget"
+        "uri": "http://sindit.sintef.no/2.0#sld-target"
       }
     ]
   },
@@ -95,16 +95,16 @@
     "assetDescription": "Collection of the data from the vacuum suction gripper (vgr)",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#vgrStation"
+        "uri": "http://sindit.sintef.no/2.0#vgr-station"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#vgrCode"
+        "uri": "http://sindit.sintef.no/2.0#vgr-code"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#vgrActive"
+        "uri": "http://sindit.sintef.no/2.0#vgr-active"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#vgrTarget"
+        "uri": "http://sindit.sintef.no/2.0#vgr-target"
       }
     ]
   },
@@ -115,16 +115,16 @@
     "assetDescription": "Collection of the data from the high-bay warehouse (hbw)",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#hbwStation"
+        "uri": "http://sindit.sintef.no/2.0#hbw-station"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#hbwCode"
+        "uri": "http://sindit.sintef.no/2.0#hbw-code"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#hbwActive"
+        "uri": "http://sindit.sintef.no/2.0#hbw-active"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#hbwTarget"
+        "uri": "http://sindit.sintef.no/2.0#hbw-target"
       }
     ]
   },
@@ -135,16 +135,16 @@
     "assetDescription": "Collection of the data from the Multi-Processing Station (mpo)",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#mpoStation"
+        "uri": "http://sindit.sintef.no/2.0#mpo-station"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#mpoCode"
+        "uri": "http://sindit.sintef.no/2.0#mpo-code"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#mpoActive"
+        "uri": "http://sindit.sintef.no/2.0#mpo-active"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#mpoTarget"
+        "uri": "http://sindit.sintef.no/2.0#mpo-target"
       }
     ]
   },
@@ -155,16 +155,16 @@
     "assetDescription": "Collection of the data from DSO",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#dsoStation"
+        "uri": "http://sindit.sintef.no/2.0#dso-station"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#dsoCode"
+        "uri": "http://sindit.sintef.no/2.0#dso-code"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#dsoActive"
+        "uri": "http://sindit.sintef.no/2.0#dso-active"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#dsoTarget"
+        "uri": "http://sindit.sintef.no/2.0#dso-target"
       }
     ]
   },
@@ -175,16 +175,16 @@
     "assetDescription": "Collection of the data from DSI",
     "assetProperties": [
       {
-        "uri": "http://sindit.sintef.no/2.0#dsiStation"
+        "uri": "http://sindit.sintef.no/2.0#dsi-station"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#dsiCode"
+        "uri": "http://sindit.sintef.no/2.0#dsi-code"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#dsiActive"
+        "uri": "http://sindit.sintef.no/2.0#dsi-active"
       },
       {
-        "uri": "http://sindit.sintef.no/2.0#dsiTarget"
+        "uri": "http://sindit.sintef.no/2.0#dsi-target"
       }
     ]
   }
