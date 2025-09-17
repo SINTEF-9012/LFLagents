@@ -75,6 +75,9 @@ def initialize_session_state():
     if "chart_saver" not in st.session_state:
         st.session_state.chart_saver = ChartImageSaver()
 
+    if "source_filter" not in st.session_state:
+        st.session_state.source_filter = None
+
 
 def get_agent_instance(agent_type):
     """Get or create an agent instance."""
@@ -179,7 +182,8 @@ def process_query(query, progress_container=None):
         if st.session_state.current_agent == "integrated":
             with progress_container:
                 progress_bar.progress(50, text="Retrieving data...")
-            response = agent.query(query)
+            source_filter = st.session_state.get('source_filter')
+            response = agent.query(query, source_filter=source_filter)
             response_time = (datetime.now() - start_time).total_seconds()
 
             # Check if a chart can be generated for this query - only if analytics is needed
@@ -202,6 +206,7 @@ def process_query(query, progress_container=None):
                 "query_classification": classification,
                 "response_time_sec": response_time,
                 "chart_generated": chart_figure is not None,
+                "source_filter": source_filter,
             }
         elif st.session_state.current_agent == "monitoring":
             with progress_container:
@@ -216,12 +221,14 @@ def process_query(query, progress_container=None):
         elif st.session_state.current_agent == "retriever":
             with progress_container:
                 progress_bar.progress(50, text="Searching documentation...")
-            response = agent.query(query)
+            source_filter = st.session_state.get('source_filter')
+            response = agent.query(query, source_filter=source_filter)
             response_time = (datetime.now() - start_time).total_seconds()
             metadata = {
                 "agent_type": "RetrieverAgent",
                 "connection_status": agent.get_neo4j_status(),
                 "response_time_sec": response_time,
+                "source_filter": source_filter,
             }
         elif st.session_state.current_agent == "analytics":
             with progress_container:
@@ -666,6 +673,57 @@ def main():
         )
         st.session_state.current_agent = selected_agent
 
+        # Use case selection (for retriever and integrated agents)
+        if selected_agent in ["integrated", "retriever"]:
+            st.markdown("---")
+            st.subheader("Use Case Selection")
+
+            # Get available sources from the agent
+            agent_instance = get_agent_instance(selected_agent)
+            if agent_instance and hasattr(agent_instance, 'get_available_sources'):
+                try:
+                    available_sources = agent_instance.get_available_sources()
+                    if available_sources:
+                        # Define user-friendly display names for sources
+                        source_display_map = {
+                            "uc1": "UC1: Fischertechnik Training Factory",
+                            "uc2": "UC2: Industrial Milling Machines"
+                        }
+
+                        # Create display options with fallback to original names
+                        display_options = ["All Sources"]
+                        for source in available_sources:
+                            display_name = source_display_map.get(source, source.upper())
+                            display_options.append(display_name)
+
+                        # Create reverse mapping for internal use
+                        display_to_source_map = {display_options[0]: None}  # "All Sources" -> None
+                        for source in available_sources:
+                            display_name = source_display_map.get(source, source.upper())
+                            display_to_source_map[display_name] = source
+
+                        selected_display = st.selectbox(
+                            "Filter by Use Case",
+                            options=display_options,
+                            index=0,  # Default to "All Sources"
+                            help="Select a specific use case to filter documentation results"
+                        )
+
+                        # Store the source filter using the reverse mapping
+                        st.session_state.source_filter = display_to_source_map.get(selected_display)
+                    else:
+                        st.warning("No sources available in the database")
+                        st.session_state.source_filter = None
+                except Exception as e:
+                    st.error(f"Error loading sources: {e}")
+                    st.session_state.source_filter = None
+            else:
+                st.warning("Source filtering not available for this agent")
+                st.session_state.source_filter = None
+        else:
+            # For monitoring and analytics agents, no source filtering
+            st.session_state.source_filter = None
+
         # Agent descriptions
         st.markdown("### Agent Capabilities")
 
@@ -676,6 +734,7 @@ def main():
             - Real-time monitoring data
             - User manuals
             - Comprehensive insights
+            - Source filtering by use case
             - Best for most queries
             """
             )
@@ -697,6 +756,7 @@ def main():
             - Setup procedures
             - Technical documentation
             - Historical knowledge
+            - Source filtering by use case
             """
             )
         elif selected_agent == "analytics":
@@ -884,51 +944,120 @@ def main():
         progress_container = st.empty()
 
         # Chat input - positioned after main content area
-        placeholder_text = {
-            "integrated": "Ask about manufacturing status, procedures, or get help...",
-            "monitoring": "Ask about current sensor data, equipment status...",
-            "retriever": "Ask about setup procedures, documentation...",
-            "analytics": "Ask for data analysis, visualizations, or metrics...",
-        }
+        # Create dynamic placeholder text based on agent and source filter
+        source_filter = st.session_state.get('source_filter')
+        
+        if st.session_state.current_agent == "integrated":
+            if source_filter == "uc1":
+                placeholder = "Ask about fischertechnik factory setup, PLC programming, or system status..."
+            elif source_filter == "uc2":
+                placeholder = "Ask about milling machine operation, maintenance, or specifications..."
+            else:
+                placeholder = "Ask about manufacturing systems, procedures, or current status..."
+        elif st.session_state.current_agent == "retriever":
+            if source_filter == "uc1":
+                placeholder = "Ask about SIMATIC configuration, TIA Portal, or factory documentation..."
+            elif source_filter == "uc2":
+                placeholder = "Ask about machine 7152, 11007, PM-10005 operation or maintenance..."
+            else:
+                placeholder = "Ask about setup procedures, documentation, or manuals..."
+        else:
+            placeholder_text = {
+                "monitoring": "Ask about current sensor data, equipment status...",
+                "analytics": "Ask for data analysis, visualizations, or metrics...",
+            }
+            placeholder = placeholder_text.get(st.session_state.current_agent, "How can I help you?")
 
-        if prompt := st.chat_input(
-            placeholder_text.get(st.session_state.current_agent, "How can I help you?")
-        ):
+        if prompt := st.chat_input(placeholder):
             # Pass the progress container to the process_query function
             process_query(prompt, progress_container)
             st.rerun()
 
         # Example queries section (only show in chat mode)
         with st.expander("💡 Example Queries"):
-            examples = {
-                "integrated": [
-                    "What's the current factory status?",
-                    "How do I set up the MQTT connection?",
-                ],
-                "monitoring": [
+            # Create use case-aware examples
+            source_filter = st.session_state.get('source_filter')
+            
+            if st.session_state.current_agent == "integrated":
+                if source_filter == "uc1":
+                    examples = [
+                        "How to configure the SIMATIC S7-1500 PLC?",
+                        "What are the setup steps for TIA Portal?",
+                        "How do I program the TXT controller?",
+                        "What's the current factory status?",
+                        "How to troubleshoot PLC connection issues?"
+                    ]
+                elif source_filter == "uc2":
+                    examples = [
+                        "How to operate machine 7152?",
+                        "What are the specifications for machine 11007?",
+                        "How to program the PM-10005 machine?",
+                        "What are the safety procedures for the machines?",
+                        "How to perform maintenance on industrial machines?"
+                    ]
+                else:
+                    examples = [
+                        "What's the current factory status?",
+                        "How do I set up the MQTT connection?",
+                        "How to operate machine 7152?",
+                        "What are the specifications for machine 11007?"
+                    ]
+            elif st.session_state.current_agent == "retriever":
+                if source_filter == "uc1":
+                    examples = [
+                        "How to configure the SIMATIC S7-1500 PLC?",
+                        "What are the setup steps for TIA Portal?",
+                        "How do I program the TXT controller?",
+                        "What is the procedure for MQTT communication?",
+                        "How to configure IoT gateway?"
+                    ]
+                elif source_filter == "uc2":
+                    examples = [
+                        "How to operate machine 7152?",
+                        "What are the specifications for machine 11007?",
+                        "How to program the PM-10005 machine?",
+                        "What are the safety procedures for the machines?",
+                        "How to perform maintenance on industrial machines?"
+                    ]
+                else:
+                    examples = [
+                        "How to configure IoT gateway?",
+                        "How to operate machine 7152?",
+                        "Troubleshooting guide",
+                        "System architecture overview"
+                    ]
+            elif st.session_state.current_agent == "monitoring":
+                examples = [
                     "Current temperature readings?",
                     "VGR status?",
                     "Equipment health check",
-                ],
-                "retriever": [
-                    "How to configure IoT gateway?",
-                    "Troubleshooting guide",
-                    "System architecture overview",
-                ],
-                "analytics": [
+                    "What is the current humidity?",
+                    "Show me all sensor statuses"
+                ]
+            elif st.session_state.current_agent == "analytics":
+                examples = [
                     "What happened on 2nd December 2022 between 14:00 and 14:30?",
                     "Analyze production process with data and visual insights",
                     "Show me the environmental conditions with analysis",
-                ],
-            }
+                    "Analyze VGR performance patterns",
+                    "Generate a chart showing cycle time trends"
+                ]
+            else:
+                examples = []
 
-            # Show basic examples for current agent
-            for example in examples.get(st.session_state.current_agent, []):
-                if st.button(f"💭 {example}", key=f"example_{example}"):
-                    # Create a progress container for the example query
-                    example_progress = st.empty()
-                    process_query(example, example_progress)
-                    st.rerun()
+            # Show examples for current agent and use case
+            if examples:
+                st.markdown(f"**Examples for {agent_options[st.session_state.current_agent]}:**")
+                if source_filter:
+                    source_name = {"uc1": "UC1: Fischertechnik Training Factory", "uc2": "UC2: Industrial Milling Machines"}.get(source_filter, source_filter)
+                    st.caption(f"Filtered for: {source_name}")
+                
+                for example in examples:
+                    if st.button(f"💭 {example}", key=f"example_{example}"):
+                        # Create a progress container for the example query
+                        example_progress = st.empty()
+                        process_query(example, example_progress)
+                        st.rerun()
 
         # System status section (appears after chat input)
         with st.expander("🔌 System Status"):

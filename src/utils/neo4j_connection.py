@@ -73,7 +73,7 @@ def update_vector_index(index_name="documents", source_filter=None):
         retrieval_query = f"""
         MATCH (n:Document)
         WHERE n.source = '{source_filter}'
-        RETURN n.text AS text, score, n {{.*}} AS metadata
+        RETURN n.text AS text, n {{.*}} AS metadata
         """
     else:
         retrieval_query = None
@@ -268,105 +268,33 @@ def setup_single_source_vector_index(source: str):
         return False
 
 def load_vector_index(
-    index_name=None,
-    embedding=None,
-    source_filter=None,
+    index_name="documents",
+    embedding=embedding_model,
 ):
     """
-    Load an existing vector index for Document nodes with error handling and fallbacks.
+    Call the existing vector index for Document nodes.
 
     Args:
-        index_name (str): The name of the vector index to retrieve. If None, defaults to "documents".
-                         For source-specific searches, use "documents" with source_filter.
-        embedding (OpenAIEmbeddings): The embedding model to use.
-        source_filter (str): Optional source filter for retrieval (e.g., 'uc1', 'uc2').
-                           This filters results at query time, not index level.
+        index_name (str): The name of the vector index to retrieve. Defaults to "documents".
+        embedding (OpenAIEmbeddings): The embedding model to use. Defaults to OpenAIEmbeddings with "text-embedding-3-small".
 
     Returns:
         Neo4jVector: An instance of the Neo4jVector for the specified index.
-    
-    Raises:
-        Exception: If the index cannot be loaded or created.
     """
-    # Default to unified index name
-    if index_name is None:
-        index_name = "documents"
-    
-    print(f"Loading vector index: '{index_name}'" + (f" (filtering for: {source_filter})" if source_filter else " (no filtering)"))
-    
     # Use default embedding if none is provided
     if embedding is None:
-        embedding = embedding_model  # Use the global multilingual embedding model
+        embedding = embedding_model
 
-    # Configure retrieval query for source filtering
-    if source_filter:
-        retrieval_query = f"""
-        MATCH (n:Document)
-        WHERE n.source = '{source_filter}'
-        RETURN n.text AS text, score, n {{.*}} AS metadata
-        """
-    else:
-        retrieval_query = None
+    # Initialize the Neo4j vector index
+    neo4j_vector = Neo4jVector.from_existing_index(
+        embedding=embedding,
+        index_name=index_name,
+        url=os.environ["NEO4J_URL"],
+        username=os.environ["NEO4J_USERNAME"],
+        password=os.environ["NEO4J_PASSWORD"],
+    )
 
-    try:
-        # Try to load the vector index directly
-        neo4j_vector = Neo4jVector.from_existing_index(
-            embedding=embedding,
-            index_name=index_name,
-            url=os.environ["NEO4J_URL"],
-            username=os.environ["NEO4J_USERNAME"],
-            password=os.environ["NEO4J_PASSWORD"],
-            retrieval_query=retrieval_query,
-        )
-        
-        return neo4j_vector
-
-    except Exception as e:
-        error_msg = str(e).lower()
-        
-        # Handle specific error cases
-        if "does not exist" in error_msg or "not found" in error_msg:
-            print(f"Index '{index_name}' not found. Attempting to create and populate...")
-            
-            try:
-                # Try using from_existing_graph as a fallback
-                neo4j_vector = Neo4jVector.from_existing_graph(
-                    embedding=embedding,
-                    index_name=index_name,
-                    node_label="Document",
-                    text_node_properties=["text"],
-                    embedding_node_property="embedding",
-                    retrieval_query=retrieval_query,
-                )
-                print(f"Successfully created vector index '{index_name}' using from_existing_graph")
-                return neo4j_vector
-                
-            except Exception as e2:
-                print(f"from_existing_graph also failed: {e2}")
-                
-                # Last resort: create index manually and try again
-                try:
-                    create_vector_index(index_name)
-                    update_vector_index(index_name, source_filter)
-                    
-                    # Try loading again after creation
-                    neo4j_vector = Neo4jVector.from_existing_index(
-                        embedding=embedding,
-                        index_name=index_name,
-                        url=os.environ["NEO4J_URL"],
-                        username=os.environ["NEO4J_USERNAME"],
-                        password=os.environ["NEO4J_PASSWORD"],
-                        retrieval_query=retrieval_query,
-                    )
-                    print(f"Successfully loaded vector index '{index_name}' after manual creation")
-                    return neo4j_vector
-                    
-                except Exception as e3:
-                    print(f"Manual creation also failed: {e3}")
-                    raise Exception(f"Failed to load or create vector index '{index_name}': {e3}")
-        else:
-            print(f"Unexpected error loading vector index '{index_name}': {e}")
-            raise e
+    return neo4j_vector
 
 def get_vector_index_info():
     """Get information about available vector indexes."""

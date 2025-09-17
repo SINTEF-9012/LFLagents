@@ -11,7 +11,7 @@ import os
 import numpy as np
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 from langchain.chains import LLMChain
 from langchain.prompts import (ChatPromptTemplate, HumanMessagePromptTemplate,
@@ -57,6 +57,7 @@ class IntegratedManufacturingAgent:
         # Curated taxonomy of manufacturing-related use cases with example questions
         self.example_questions = {
             'documentation': [
+                # UC1 - Fischertechnik Training Factory documentation examples
                 "How to configure the SIMATIC S7-1500 PLC for the training factory?",
                 "What are the setup steps for TIA Portal?",
                 "How do I program the TXT controller?",
@@ -71,7 +72,23 @@ class IntegratedManufacturingAgent:
                 "What manual should I follow for system maintenance?",
                 "Guide me through the educational simulation setup",
                 "What are the safety procedures for the training factory?",
-                "How to configure the vacuum gripper robot programming?"
+                "How to configure the vacuum gripper robot programming?",
+                # UC2 - Industrial Milling Machines documentation examples
+                "How to operate machine 7152?",
+                "What are the specifications for machine 11007?",
+                "How to program the PM-10005 machine?",
+                "Where can I find technical documentation for the machines?",
+                "How to perform maintenance on industrial machines?",
+                "What are the safety procedures for the machines?",
+                "Machine programming and setup instructions",
+                "Milling machine operation manual",
+                "Industrial equipment maintenance procedures",
+                "How to troubleshoot machine 7152?",
+                "What is the operating temperature range for machine 11007?",
+                "PM-10005 calibration procedures",
+                "Machine safety protocols and guidelines",
+                "How to change tools on the milling machine?",
+                "What are the cutting parameters for different materials?"
             ],
             'monitoring': [
                 "What is the current temperature in the factory?",
@@ -170,18 +187,19 @@ class IntegratedManufacturingAgent:
             # Fallback to equal weights
             return {'documentation': 0.33, 'monitoring': 0.33, 'analytics': 0.33}
 
-    def initialize_conversation_chain(self):
-        """Initialize the conversation chain for the integrated agent."""
+    def initialize_conversation_chain(self, source_filter: str = None):
+        """Initialize the conversation chain for the integrated agent with use case-specific context."""
 
-        self.system_msg_template = SystemMessagePromptTemplate.from_template(
-            template="""
-            You are an Integrated Manufacturing Assistant for the fischertechnik Training Factory Industry 4.0 system.
+        # Create context-aware system message based on source filter
+        if source_filter == "uc1":
+            system_template = """
+            You are an Integrated Manufacturing Assistant specialized in the fischertechnik Training Factory Industry 4.0 system.
             You combine comprehensive documentation knowledge, real-time monitoring capabilities, and advanced analytics.
 
             Your capabilities include:
 
             DOCUMENTATION & KNOWLEDGE (via Neo4j):
-            - Factory components and configuration details
+            - Factory components and configuration details (high-bay warehouse, suction gripper, sorting line)
             - SIMATIC S7-1500 PLC programming and TIA Portal usage
             - TXT controller setup and communication protocols (MQTT/OPC UA)
             - IoT Gateway configuration and Node-RED dashboards
@@ -212,26 +230,104 @@ class IntegratedManufacturingAgent:
             - Process efficiency metrics
             - Predictive maintenance indicators
 
-            INTEGRATION APPROACH:
-            When answering questions:
-            1. First determine if the question requires static knowledge, real-time data, historical analytics, or combinations
-            2. Retrieve relevant documentation/manuals if needed for context
-            3. Get current real-time data if the question involves current status or monitoring
-            4. Perform historical analysis if the question involves trends, patterns, or performance optimization
-            5. Combine all sources to provide comprehensive, accurate responses
-            6. Clearly distinguish between documented procedures, current operational status, and historical insights
-            7. Provide related information that bridges theory, current practice, and historical performance
-
-            RESPONSE STRUCTURE:
-            - Start with current status/data if relevant
-            - Provide contextual documentation/procedures as needed
-            - Include historical insights and trends when applicable
-            - Indicate data sources (documentation vs. real-time vs. historical) for transparency
-
-            If any data source is unavailable, clearly indicate this and work with available information.
-            Always prioritize accuracy and practical utility in manufacturing contexts.
+            Focus on fischertechnik Training Factory specific information and provide detailed technical guidance for Industry 4.0 learning scenarios.
             """
-        )
+        elif source_filter == "uc2":
+            system_template = """
+            You are an Integrated Manufacturing Assistant specialized in industrial milling machines and manufacturing equipment.
+            You combine comprehensive documentation knowledge, real-time monitoring capabilities, and advanced analytics.
+
+            Your capabilities include:
+
+            DOCUMENTATION & KNOWLEDGE (via Neo4j):
+            - Industrial milling machine operation and specifications (machines 7152, 11007, PM-10005)
+            - Machine programming and setup instructions
+            - Safety protocols and maintenance procedures
+            - Technical documentation and operating parameters
+            - Troubleshooting and repair procedures
+            - Manufacturing process optimization
+
+            Note: Documentation may be in Spanish, but you should respond in English unless specifically asked otherwise.
+
+            REAL-TIME MONITORING (via SINDIT DT Platform):
+            - Live sensor data (temperature, humidity, air quality, brightness)
+            - Manufacturing equipment status monitoring
+            - Environmental condition monitoring
+            - System connectivity and health assessment
+
+            HISTORICAL ANALYTICS & INSIGHTS (via Analytics Agent):
+            - Process cycle analysis and optimization
+            - Historical data trends and patterns
+            - Component performance analysis
+            - Environmental condition analysis
+            - Interactive charts and visualizations
+            - Data-driven manufacturing insights
+            - Process efficiency metrics
+            - Predictive maintenance indicators
+
+            Focus on industrial milling machine operations, maintenance, and manufacturing processes. Provide practical guidance for machine operation and maintenance.
+            """
+        else:
+            # Default template for all sources or when no filter is specified
+            system_template = """
+            You are an Integrated Manufacturing Assistant that combines comprehensive documentation knowledge, real-time monitoring capabilities, and advanced analytics.
+
+            Your capabilities cover two main areas:
+            1. Fischertechnik Training Factory Industry 4.0 system (UC1)
+            2. Industrial milling machines and manufacturing equipment (UC2)
+
+            DOCUMENTATION & KNOWLEDGE (via Neo4j):
+            - Factory automation components and PLC systems (UC1)
+            - Industrial machine operation and maintenance (UC2)
+            - Communication protocols (MQTT/OPC UA)
+            - Manufacturing processes and procedures
+            - Safety protocols and technical specifications
+            - System setup, programming, and troubleshooting
+
+            REAL-TIME MONITORING (via SINDIT DT Platform):
+            - Live sensor data (temperature, humidity, air quality, brightness)
+            - Manufacturing equipment status monitoring
+            - Environmental condition monitoring
+            - System connectivity and health assessment
+
+            HISTORICAL ANALYTICS & INSIGHTS (via Analytics Agent):
+            - Process cycle analysis and optimization
+            - Historical data trends and patterns
+            - Component performance analysis
+            - Environmental condition analysis
+            - Interactive charts and visualizations
+            - Data-driven manufacturing insights
+            - Process efficiency metrics
+            - Predictive maintenance indicators
+
+            Provide comprehensive assistance across both training factory automation and industrial manufacturing domains.
+            """
+
+        # Common integration approach for all templates
+        integration_approach = """
+        INTEGRATION APPROACH:
+        When answering questions:
+        1. First determine if the question requires static knowledge, real-time data, historical analytics, or combinations
+        2. Retrieve relevant documentation/manuals if needed for context
+        3. Get current real-time data if the question involves current status or monitoring
+        4. Perform historical analysis if the question involves trends, patterns, or performance optimization
+        5. Combine all sources to provide comprehensive, accurate responses
+        6. Clearly distinguish between documented procedures, current operational status, and historical insights
+        7. Provide related information that bridges theory, current practice, and historical performance
+
+        RESPONSE STRUCTURE:
+        - Start with current status/data if relevant
+        - Provide contextual documentation/procedures as needed
+        - Include historical insights and trends when applicable
+        - Indicate data sources (documentation vs. real-time vs. historical) for transparency
+
+        If any data source is unavailable, clearly indicate this and work with available information.
+        Always prioritize accuracy and practical utility in manufacturing contexts.
+        """
+
+        full_template = system_template + integration_approach
+
+        self.system_msg_template = SystemMessagePromptTemplate.from_template(template=full_template)
 
         self.human_msg_template = HumanMessagePromptTemplate.from_template(template="{input}")
 
@@ -393,16 +489,20 @@ class IntegratedManufacturingAgent:
         # Fallback to default
         return {"realtime": True, "documentation": True, "analytics": True}
 
-    def query(self, user_query: str) -> str:
+    def query(self, user_query: str, source_filter: str = None) -> str:
         """
         Process a user query using integrated knowledge, monitoring, and analytics.
 
         Args:
             user_query: User's question
+            source_filter: Optional source filter for documentation retrieval (e.g., 'uc1', 'uc2')
 
         Returns:
             str: Comprehensive integrated response
         """
+        # Reinitialize conversation chain with appropriate context for the source filter
+        self.initialize_conversation_chain(source_filter=source_filter)
+        
         # Classify the query type
         query_classification = self.classify_query_type(user_query)
 
@@ -410,13 +510,14 @@ class IntegratedManufacturingAgent:
         context = {
             "user_query": user_query,
             "timestamp": datetime.now().isoformat(),
-            "query_classification": query_classification
+            "query_classification": query_classification,
+            "source_filter": source_filter
         }
 
         # Get documentation context if needed
         if query_classification['RetrieverAgent']:
             try:
-                doc_context = self.retriever_agent.get_documentation_context(user_query)
+                doc_context = self.retriever_agent.get_documentation_context(user_query, source_filter=source_filter)
                 context["documentation"] = doc_context
             except Exception as e:
                 context["documentation"] = {"error": f"Documentation unavailable: {str(e)}"}
@@ -478,6 +579,19 @@ class IntegratedManufacturingAgent:
         response = self.conversation_chain.run(input=formatted_input)
 
         return response
+
+    def get_available_sources(self) -> List[str]:
+        """
+        Get list of available sources from the RetrieverAgent.
+
+        Returns:
+            List[str]: List of available source values
+        """
+        try:
+            return self.retriever_agent.get_available_sources()
+        except Exception as e:
+            print(f"Error retrieving available sources: {e}")
+            return []
 
     def get_process_analysis(self, query: str, time_range: Optional[Tuple[datetime, datetime]] = None) -> Dict[str, Any]:
         """
@@ -597,3 +711,16 @@ class IntegratedManufacturingAgent:
         status["system_components"]["analytics"] = analytics_status
 
         return status
+
+    def get_available_sources(self) -> List[str]:
+        """
+        Get list of available sources from the documentation system.
+
+        Returns:
+            List[str]: List of available source values
+        """
+        try:
+            return self.retriever_agent.get_available_sources()
+        except Exception as e:
+            print(f"Error retrieving available sources: {e}")
+            return []

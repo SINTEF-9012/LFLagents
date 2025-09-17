@@ -11,8 +11,8 @@ import json
 from datetime import datetime
 
 from utils.neo4j_connection import graph, load_vector_index
+from utils.llm_config import get_llm_instance  # Use flexible LLM config
 
-from langchain_openai import ChatOpenAI
 from langchain_community.chains.graph_qa.cypher import GraphCypherQAChain
 
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -21,7 +21,7 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 
 from langchain.pydantic_v1 import BaseModel
 from langchain.tools import BaseTool
-from typing import Type, Dict, Any
+from typing import Type, Dict, Any, List, Optional
 
 import streamlit as st
 from langchain.prompts import (
@@ -32,25 +32,29 @@ from langchain.prompts import (
 
 # Load environment variables
 CHAT_MODEL = os.getenv('CHAT_MODEL')
-TEMPERATURE = os.getenv('TEMPERATURE')
+TEMPERATURE = float(os.getenv('TEMPERATURE', 0.0))
 
 # Load the graph db
 neo4j_graph = graph
 
 class Question(BaseModel):
     question: str
+    source_filter: str = None
 
 class Neo4jVectorTool(BaseTool):
     name: str = "neo4j_vector_tool"
     description: str = "Tool for performing similarity-based retrieval from the Neo4j vector index."
     args_schema: Type[Question] = Question
 
-    def _run(self, question):
+    def _run(self, question: str, source_filter: str = None):
         # Initialize Neo4j vector index
         neo4j_vector = load_vector_index()
 
         # Perform similarity search
-        results = neo4j_vector.similarity_search(question, k=5)
+        results = neo4j_vector.similarity_search(question,
+                                                 k=5,
+                                                 filter={"source": source_filter} if source_filter else None)
+        
         all_pages = "\n".join([result.page_content for result in results])
 
         return all_pages
@@ -60,12 +64,13 @@ class Neo4jCypherTool(BaseTool):
     description: str = "Tool for retrieving structured, interconnected, and relational knowledge from the Neo4j graph."
     args_schema: Type[Question] = Question
 
-    def _run(self, question: str):
+    def _run(self, question: str, source_filter: str = None):
         """
         Execute a Cypher query based on the user's question.
 
         Args:
             question (str): The user's natural language question.
+            source_filter (str): Optional source filter (e.g., 'uc1', 'uc2').
 
         Returns:
             dict: The results of the Cypher query executed on the Neo4j graph.
@@ -79,10 +84,14 @@ class Neo4jCypherTool(BaseTool):
         # cypher_validation = CypherQueryCorrector(corrector_schema)
 
         # LLM for Cypher query generation
-        CYPHER_LLM = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        CYPHER_LLM = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
 
-        # Generate Cypher query
-        CYPHER_GENERATION_TEMPLATE = """
+        # Generate Cypher query with source filtering
+        source_instruction = ""
+        if source_filter:
+            source_instruction = f"- Filter results to only include nodes with source = '{source_filter}'"
+
+        CYPHER_GENERATION_TEMPLATE = f"""
         Task: Generate Cypher statement to query a graph database.
         Instructions:
         - Use only the provided relationship types and properties in the schema
@@ -93,11 +102,12 @@ class Neo4jCypherTool(BaseTool):
         - Limit results appropriately to avoid overwhelming responses
         - Use OPTIONAL MATCH for relationships that may not exist
         - Always include node labels and key properties in results
+        {source_instruction}
 
         Schema:
-        {schema}
+        {{schema}}
 
-        Question: {question}
+        Question: {{question}}
 
         Generate only the Cypher statement without explanations.
         """
@@ -127,8 +137,8 @@ class RetrieverAgent:
         self.cypher_tool = Neo4jCypherTool()
         self.vector_tool = Neo4jVectorTool()
 
-        # Initialize chat model
-        self.llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        # Initialize chat model with flexible LLM config
+        self.llm = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
         # Initialize session state variables
         self.initialize_session_state()
 
@@ -153,10 +163,11 @@ class RetrieverAgent:
             st.session_state['chat_history'] = []
 
 
-    def initialize_conversation_chain(self):
-        self.system_msg_template = SystemMessagePromptTemplate.from_template(
-            template="""
-            You are an expert assistant trained on the fischertechnik Training Factory Industry 4.0 system.
+    def initialize_conversation_chain(self, source_filter: str = None):
+        # Create context-aware system message based on source filter
+        if source_filter == "uc1":
+            system_template = """
+            You are an expert assistant specialized in the fischertechnik Training Factory Industry 4.0 system.
             Your goal is to answer questions by integrating knowledge from both structured data (Cypher results) and unstructured content (Vector results) relevant to the Training Factory.
 
             Based on the question, Cypher results, and Vector results, write a clear and informative natural language response that is technically accurate and aligned with the Training Factory system.
@@ -171,7 +182,47 @@ class RetrieverAgent:
 
             Be concise, avoid speculation, and if information is missing, clearly indicate what is unknown.
             """
-        )
+        elif source_filter == "uc2":
+            system_template = """
+            You are an expert assistant specialized in industrial milling machines and manufacturing equipment.
+            Your goal is to answer questions by integrating knowledge from both structured data (Cypher results) and unstructured content (Vector results) relevant to industrial milling machines.
+
+            The documentation may be in Spanish, but you should respond in English unless specifically asked otherwise.
+            
+            Based on the question, Cypher results, and Vector results, write a clear and informative natural language response that is technically accurate.
+            You may cover aspects such as:
+            - Machine operation procedures and specifications
+            - Safety protocols and maintenance instructions
+            - Technical documentation for machines like 7152, 11007, and PM-10005
+            - Operating parameters and configurations
+            - Troubleshooting and repair procedures
+            - Machine programming and setup instructions
+
+            Be concise, avoid speculation, and if information is missing, clearly indicate what is unknown.
+            """
+        else:
+            # Default template for all sources or when no filter is specified
+            system_template = """
+            You are an expert assistant trained on manufacturing systems and industrial documentation.
+            Your goal is to answer questions by integrating knowledge from both structured data (Cypher results) and unstructured content (Vector results).
+
+            The documentation covers two main areas:
+            1. Fischertechnik Training Factory Industry 4.0 system (UC1)
+            2. Industrial milling machines and manufacturing equipment (UC2)
+
+            Based on the question, Cypher results, and Vector results, write a clear and informative natural language response that is technically accurate.
+            You may cover aspects such as:
+            - Factory automation components and PLC systems
+            - Industrial machine operation and maintenance
+            - Communication protocols (MQTT/OPC UA)
+            - Manufacturing processes and procedures
+            - Safety protocols and technical specifications
+            - System setup, programming, and troubleshooting
+
+            Be concise, avoid speculation, and if information is missing, clearly indicate what is unknown.
+            """
+
+        self.system_msg_template = SystemMessagePromptTemplate.from_template(template=system_template)
         self.human_msg_template = HumanMessagePromptTemplate.from_template(template="{input}")
         self.prompt_template = ChatPromptTemplate.from_messages(
             [self.system_msg_template, MessagesPlaceholder(variable_name="history"), self.human_msg_template]
@@ -192,26 +243,28 @@ class RetrieverAgent:
     #         for query, response in chat_history:
     #             file.write(f"User: {query}\nBot: {response}\n\n")
 
-    def get_documentation_context(self, query: str) -> Dict[str, Any]:
+    def get_documentation_context(self, query: str, source_filter: str = None) -> Dict[str, Any]:
         """
         Get relevant documentation context using retriever tools.
 
         Args:
             query: User's question
+            source_filter: Optional source filter (e.g., 'uc1', 'uc2')
 
         Returns:
             dict: Documentation context
         """
         # Get vector similarity results
-        vector_results = self.vector_tool.run(query)
+        vector_results = self.vector_tool.run(query, source_filter=source_filter)
 
         # Get cypher query results
-        cypher_results = self.cypher_tool.run(query)
+        cypher_results = self.cypher_tool.run(query, source_filter=source_filter)
 
         return {
             "vector_results": vector_results,
             "cypher_results": cypher_results,
             "source": "RetrieverAgent",
+            "source_filter": source_filter,
             "timestamp": datetime.now().isoformat()
         }
 
@@ -236,8 +289,19 @@ class RetrieverAgent:
 
         # Component-specific keywords
         component_keywords = [
+            # UC1 - Fischertechnik Training Factory keywords
             'plc', 'tia portal', 'simatic', 's7-1500', 'txt controller',
-            'mqtt', 'opc ua', 'node-red', 'iot gateway', 'dashboard'
+            'mqtt', 'opc ua', 'node-red', 'iot gateway', 'dashboard',
+            'fischertechnik', 'training factory', 'high-bay warehouse',
+            'suction gripper', 'sorting line', 'vacuum gripper', 'vgr',
+            'hbw', 'sld', 'mpo', 'dso', 'dsi', 'factory components',
+            
+            # UC2 - Industrial Milling Machines keywords  
+            'machine 7152', 'machine 11007', 'pm-10005', 'milling machine',
+            'industrial machine', 'machine operation', 'machine programming',
+            'machine maintenance', 'machine safety', 'machine specifications',
+            'cutting parameters', 'tool change', 'calibration', 'cnc',
+            'machining', 'manufacturing equipment', 'industrial equipment'
         ]
 
         needs_documentation = any(keyword in query_lower for keyword in documentation_keywords)
@@ -251,19 +315,23 @@ class RetrieverAgent:
             'is_troubleshoot_query': 'troubleshoot' in query_lower or 'problem' in query_lower
         }
 
-    def query(self, user_query: str) -> str:
+    def query(self, user_query: str, source_filter: str = None) -> str:
         """
         Process a user query with full documentation context.
 
         Args:
             user_query: User's question
+            source_filter: Optional source filter (e.g., 'uc1', 'uc2')
 
         Returns:
             str: Response with integrated documentation context
         """
         try:
+            # Reinitialize conversation chain with appropriate context for the source filter
+            self.initialize_conversation_chain(source_filter=source_filter)
+            
             # Get documentation context
-            doc_context = self.get_documentation_context(user_query)
+            doc_context = self.get_documentation_context(user_query, source_filter=source_filter)
 
             # Classify the query
             query_classification = self.classify_documentation_query(user_query)
@@ -282,13 +350,34 @@ class RetrieverAgent:
             Based on the above context and documentation, please provide a comprehensive answer.
             """
 
-            # Use the existing conversation chain
+            # Use the conversation chain with the appropriate system context
             response = self.conversation.predict(input=enhanced_input)
 
             return response
 
         except Exception as e:
             return f"Error processing documentation query: {str(e)}"
+
+    def get_available_sources(self) -> List[str]:
+        """
+        Get list of available sources in the Neo4j database.
+
+        Returns:
+            List[str]: List of available source values
+        """
+        try:
+            query = """
+            MATCH (n:Document)
+            WHERE n.source IS NOT NULL
+            RETURN DISTINCT n.source AS source
+            ORDER BY source
+            """
+            result = neo4j_graph.query(query)
+            sources = [record['source'] for record in result]
+            return sources
+        except Exception as e:
+            print(f"Error retrieving available sources: {e}")
+            return []
 
     def get_neo4j_status(self) -> Dict[str, Any]:
         """
