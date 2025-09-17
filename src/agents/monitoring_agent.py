@@ -19,14 +19,14 @@ from langchain.chains import LLMChain
 from langchain.prompts import (ChatPromptTemplate, HumanMessagePromptTemplate,
                                SystemMessagePromptTemplate)
 from langchain.tools import BaseTool
-from langchain_community.chat_models import ChatOpenAI
 from pydantic import BaseModel
 
 from utils.sindit_api import query_get_api, query_get_connections_info
+from utils.llm_config import get_llm_instance  # Use flexible LLM config
 
 # Load environment variables
 CHAT_MODEL = os.getenv('CHAT_MODEL')
-TEMPERATURE = os.getenv('TEMPERATURE')
+TEMPERATURE = float(os.getenv('TEMPERATURE', 0.0))
 
 class MonitoringQuery(BaseModel):
     query: str
@@ -204,8 +204,8 @@ class MonitoringAgent:
         self.sindit_data_tool = SINDITDataTool()
         # self.status_analyzer = ManufacturingStatusAnalyzer()
 
-        # Initialize chat model
-        self.llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        # Initialize chat model with flexible LLM config
+        self.llm = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
 
         # Initialize conversation chain
         self.initialize_conversation_chain()

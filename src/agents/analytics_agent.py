@@ -31,6 +31,7 @@ from utils.llm_image_explanation import (
     LLMImageAnalyzer,
     ChartImageSaver,
 )
+from utils.llm_config import get_llm_instance
 
 # Import visualization functions
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
