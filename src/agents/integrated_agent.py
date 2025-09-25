@@ -16,7 +16,8 @@ from typing import Any, Dict, Optional, Tuple, List
 from langchain.chains import LLMChain
 from langchain.prompts import (ChatPromptTemplate, HumanMessagePromptTemplate,
                                SystemMessagePromptTemplate)
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from utils.llm_config import get_llm_instance
+from utils.neo4j_connection import embedding_model
 
 from agents.monitoring_agent import MonitoringAgent
 from agents.retriever_agent import RetrieverAgent
@@ -43,8 +44,8 @@ class IntegratedManufacturingAgent:
         self.monitoring_agent = MonitoringAgent()
         self.retriever_agent = RetrieverAgent()
         self.analytics_agent = AnalyticsAgent()
-        self.llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=TEMPERATURE)
-        self.embeddings = OpenAIEmbeddings()
+        self.llm = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        self.embeddings = embedding_model
         self.last_parsed_time_range = None  # Store the last parsed time range
         
         # Initialize semantic classification system

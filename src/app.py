@@ -392,6 +392,19 @@ def display_analytics_dashboard():
         st.error("Analytics Agent not available")
         return
 
+    # Check if UC2 is selected and show machine vibration dashboard
+    source_filter = st.session_state.get('source_filter')
+    if source_filter == "uc2":
+        # Use the complete machine vibration dashboard from the viz module
+        try:
+            from machine_vibration_viz import display_machine_vibration_dashboard
+            display_machine_vibration_dashboard()
+        except Exception as e:
+            st.error(f"Error displaying machine vibration dashboard: {e}")
+            st.info("Make sure the machine_vibration_viz module is properly configured.")
+        return
+
+    # Original UC1 dashboard logic
     # Get the selected component from session state
     selected_component = st.session_state.selected_viz_component
 
@@ -673,8 +686,8 @@ def main():
         )
         st.session_state.current_agent = selected_agent
 
-        # Use case selection (for retriever and integrated agents)
-        if selected_agent in ["integrated", "retriever"]:
+        # Use case selection (for retriever, integrated and analytics agents)
+        if selected_agent in ["integrated", "retriever", "analytics"]:
             st.markdown("---")
             st.subheader("Use Case Selection")
 
@@ -784,102 +797,136 @@ def main():
                 # Get analytics agent for dashboard controls
                 analytics_agent = get_agent_instance("analytics")
                 if analytics_agent:
-                    # Get available components for visualization
-                    available_components = analytics_agent.get_available_components()
+                    # Check if UC2 is selected for machine vibration
+                    source_filter = st.session_state.get('source_filter')
+                    
+                    if source_filter == "uc2":
+                        # UC2 Machine Vibration - All controls are in the main dashboard
+                        pass  # Controls are handled in the main dashboard area
+                    else:
+                        # Original UC1 Factory Controls
+                        # Get available components for visualization
+                        available_components = analytics_agent.get_available_components()
 
-                    # Component selection
-                    selected_component = st.selectbox(
-                        "Select Component",
-                        available_components,
-                        index=(
-                            available_components.index(
-                                st.session_state.selected_viz_component
-                            )
-                            if st.session_state.selected_viz_component
-                            in available_components
-                            else 0
-                        ),
-                        format_func=lambda x: f"{x} - {analytics_agent.get_component_description(x)}",
-                    )
-                    st.session_state.selected_viz_component = selected_component
+                        # Component selection
+                        selected_component = st.selectbox(
+                            "Select Component",
+                            available_components,
+                            index=(
+                                available_components.index(
+                                    st.session_state.selected_viz_component
+                                )
+                                if st.session_state.selected_viz_component
+                                in available_components
+                                else 0
+                            ),
+                            format_func=lambda x: f"{x} - {analytics_agent.get_component_description(x)}",
+                        )
+                        st.session_state.selected_viz_component = selected_component
 
-                    # Time range selection
-                    st.subheader("Time Range")
+                        # Time range selection
+                        st.subheader("Time Range")
 
-                    # Default to a time range that matches the available data (2022-12-02 14:00 to 14:30)
-                    default_start = datetime(
-                        2022, 12, 2, 14, 0, 0
-                    )  # Start of available data
-                    default_end = datetime(
-                        2022, 12, 2, 14, 30, 0
-                    )  # 30 minutes from start
+                        # Default to a time range that matches the available data (2022-12-02 14:00 to 14:30)
+                        default_start = datetime(
+                            2022, 12, 2, 14, 0, 0
+                        )  # Start of available data
+                        default_end = datetime(
+                            2022, 12, 2, 14, 30, 0
+                        )  # 30 minutes from start
 
-                    start_time = st.date_input(
-                        "Start Date",
-                        value=(
-                            st.session_state.selected_time_range[0].date()
-                            if "selected_time_range" in st.session_state
-                            else default_start.date()
-                        ),
-                    )
+                        start_time = st.date_input(
+                            "Start Date",
+                            value=(
+                                st.session_state.selected_time_range[0].date()
+                                if "selected_time_range" in st.session_state
+                                else default_start.date()
+                            ),
+                        )
 
-                    start_hour = st.time_input(
-                        "Start Time",
-                        value=(
-                            st.session_state.selected_time_range[0].time()
-                            if "selected_time_range" in st.session_state
-                            else default_start.time()
-                        ),
-                    )
+                        start_hour = st.time_input(
+                            "Start Time",
+                            value=(
+                                st.session_state.selected_time_range[0].time()
+                                if "selected_time_range" in st.session_state
+                                else default_start.time()
+                            ),
+                        )
 
-                    end_time = st.date_input(
-                        "End Date",
-                        value=(
-                            st.session_state.selected_time_range[1].date()
-                            if "selected_time_range" in st.session_state
-                            else default_end.date()
-                        ),
-                    )
+                        end_time = st.date_input(
+                            "End Date",
+                            value=(
+                                st.session_state.selected_time_range[1].date()
+                                if "selected_time_range" in st.session_state
+                                else default_end.date()
+                            ),
+                        )
 
-                    end_hour = st.time_input(
-                        "End Time",
-                        value=(
-                            st.session_state.selected_time_range[1].time()
-                            if "selected_time_range" in st.session_state
-                            else default_end.time()
-                        ),
-                    )
+                        end_hour = st.time_input(
+                            "End Time",
+                            value=(
+                                st.session_state.selected_time_range[1].time()
+                                if "selected_time_range" in st.session_state
+                                else default_end.time()
+                            ),
+                        )
 
-                    # Combine date and time
-                    start_datetime = datetime.combine(start_time, start_hour)
-                    end_datetime = datetime.combine(end_time, end_hour)
+                        # Combine date and time
+                        start_datetime = datetime.combine(start_time, start_hour)
+                        end_datetime = datetime.combine(end_time, end_hour)
 
-                    # Update session state
-                    st.session_state.selected_time_range = (
-                        start_datetime,
-                        end_datetime,
-                    )
+                        # Update session state
+                        st.session_state.selected_time_range = (
+                            start_datetime,
+                            end_datetime,
+                        )
 
-                    # Resampling interval for data aggregation
-                    resample_interval = st.selectbox(
-                        "Resampling Interval",
-                        ["1S", "5S", "10S", "30S", "1Min", "5Min", "10Min"],
-                        index=1,  # Default to 5S
-                    )
-                    st.session_state.resample_interval = resample_interval
+                    # Resampling interval for data aggregation (only for UC1 factory data)
+                    source_filter = st.session_state.get('source_filter')
+                    if source_filter != "uc2":  # Don't show resampling for vibration data
+                        resample_interval = st.selectbox(
+                            "Resampling Interval",
+                            ["1S", "5S", "10S", "30S", "1Min", "5Min", "10Min"],
+                            index=1,  # Default to 5S
+                        )
+                        st.session_state.resample_interval = resample_interval
+                    else:
+                        # For vibration data, use the original sampling frequency
+                        st.session_state.resample_interval = "original"
 
                     # Load data button
                     if st.button("Load Data", use_container_width=True):
-                        with st.spinner(f"Loading data for {selected_component}..."):
-                            try:
-                                # Load data using the analytics agent
-                                st.session_state.component_data = (
-                                    analytics_agent.load_component_data(
-                                        [selected_component],
-                                        (start_datetime, end_datetime),
-                                        resample_interval,
-                                    )
-                                )
+                        # Handle UC1 factory data (UC2 uses its own dashboard controls)
+                        if source_filter != "uc2":
+                            # For UC1 factory data
+                            if 'selected_component' in locals():
+                                with st.spinner(f"Loading data for {selected_component}..."):
+                                    try:
+                                        # Load data using the analytics agent
+                                        st.session_state.component_data = (
+                                            analytics_agent.load_component_data(
+                                                [selected_component],
+                                                (start_datetime, end_datetime),
+                                                resample_interval,
+                                            )
+                                        )
+
+                                        if (
+                                            st.session_state.component_data
+                                            and selected_component in st.session_state.component_data
+                                            and not st.session_state.component_data[
+                                                selected_component
+                                            ].empty
+                                        ):
+                                            st.success(
+                                                f"✅ Loaded {len(st.session_state.component_data[selected_component])} records for {selected_component}"
+                                            )
+                                        else:
+                                            st.warning("No data available for the selected time range.")
+                                    except Exception as e:
+                                        st.error(f"Error loading data: {str(e)}")
+                            else:
+                                st.error("Please select a component first")
 
                                 if (
                                     st.session_state.component_data
@@ -899,10 +946,6 @@ def main():
                                     st.info(
                                         "Try adjusting the time range or selecting a different component."
                                     )
-
-                            except Exception as e:
-                                st.error(f"Error loading data: {str(e)}")
-                                st.exception(e)
 
         st.markdown("---")
 
@@ -961,10 +1004,16 @@ def main():
                 placeholder = "Ask about machine 7152, 11007, PM-10005 operation or maintenance..."
             else:
                 placeholder = "Ask about setup procedures, documentation, or manuals..."
+        elif st.session_state.current_agent == "analytics":
+            if source_filter == "uc1":
+                placeholder = "Ask for factory data analysis, production metrics, or environmental insights..."
+            elif source_filter == "uc2":
+                placeholder = "Ask about vibration analysis, tool breakage prediction, or frequency analysis..."
+            else:
+                placeholder = "Ask for data analysis, visualizations, or metrics..."
         else:
             placeholder_text = {
                 "monitoring": "Ask about current sensor data, equipment status...",
-                "analytics": "Ask for data analysis, visualizations, or metrics...",
             }
             placeholder = placeholder_text.get(st.session_state.current_agent, "How can I help you?")
 
@@ -1035,13 +1084,26 @@ def main():
                     "Show me all sensor statuses"
                 ]
             elif st.session_state.current_agent == "analytics":
-                examples = [
-                    "What happened on 2nd December 2022 between 14:00 and 14:30?",
-                    "Analyze production process with data and visual insights",
-                    "Show me the environmental conditions with analysis",
-                    "Analyze VGR performance patterns",
-                    "Generate a chart showing cycle time trends"
-                ]
+                source_filter = st.session_state.get('source_filter')
+                if source_filter == "uc2":
+                    # Machine vibration examples for UC2
+                    examples = [
+                        "Analyze vibration data for tool breakage prediction",
+                        "Show me vibration analysis for diameter 16mm Z4 endmill",
+                        "Compare vibration patterns between different tool diameters",
+                        "Generate feature analysis for machine learning training",
+                        "Analyze frequency domain patterns in vibration data",
+                        "What are the key frequencies in the vibration signal?"
+                    ]
+                else:
+                    # Factory analytics examples for UC1
+                    examples = [
+                        "What happened on 2nd December 2022 between 14:00 and 14:30?",
+                        "Analyze production process with data and visual insights",
+                        "Show me the environmental conditions with analysis",
+                        "Analyze VGR performance patterns",
+                        "Generate a chart showing cycle time trends"
+                    ]
             else:
                 examples = []
 

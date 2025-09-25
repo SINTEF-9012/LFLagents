@@ -31,7 +31,6 @@ from utils.llm_image_explanation import (
     LLMImageAnalyzer,
     ChartImageSaver,
 )
-from utils.llm_config import get_llm_instance
 
 # Import visualization functions
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -111,6 +110,12 @@ class AnalyticsAgent:
         self._llm_analyzer = None
         self._chart_saver = None
         
+        # Initialize machine vibration data path
+        self.machine_data_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "machine_data"
+        )
+        
         # Configure logging for performance monitoring
         self.logger = logging.getLogger(__name__)
 
@@ -165,6 +170,70 @@ class AnalyticsAgent:
         if component in self.component_config:
             return self.component_config[component]["description"]
         return f"Unknown component: {component}"
+
+    def get_available_sources(self) -> List[str]:
+        """Get list of available data sources/use cases."""
+        return ["uc1", "uc2"]
+
+    def _is_vibration_query(self, query: str) -> bool:
+        """Check if the query is related to vibration analysis."""
+        vibration_keywords = [
+            "vibration", "vibrations", "vibrate", "frequency", "frequencies", 
+            "tool", "breakage", "break", "broken", "cutting", "machining",
+            "endmill", "diameter", "acceleration", "accelerometer", "fft",
+            "spectral", "spectrum", "amplitude", "machine", "milling", "drill"
+        ]
+        query_lower = query.lower()
+        return any(keyword in query_lower for keyword in vibration_keywords)
+
+    def load_machine_vibration_data(self):
+        """Load machine vibration file metadata (optimized for performance)."""
+        import os
+        import json
+        from pathlib import Path
+        
+        machine_data_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent / "machine_data"
+        
+        vibration_files = []
+        
+        if not machine_data_dir.exists():
+            return vibration_files
+        
+        for json_file in machine_data_dir.rglob("*.json"):
+            try:
+                # Only load metadata for performance - actual data loaded on demand
+                with open(json_file, 'r') as f:
+                    data = json.load(f)
+                    
+                # Extract only essential metadata
+                file_info = {
+                    'file_path': str(json_file),
+                    'file_name': json_file.name,
+                    'diameter': data.get('d', 'Unknown'),
+                    'teeth': data.get('z', 'Unknown'), 
+                    'breakage': data.get('breakage', 'Unknown'),
+                    'spindle_speed': data.get('n', 3500),
+                    'sample_frequency': data.get('File_Header', {}).get('SampleFrequency', 4096)
+                }
+                
+                vibration_files.append(file_info)
+                
+            except Exception as e:
+                print(f"Error loading {json_file}: {e}")
+                continue
+        
+        return vibration_files
+
+    def load_single_machine_vibration_file(self, file_path: str):
+        """Load a single machine vibration file on demand."""
+        import json
+        
+        try:
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading {file_path}: {e}")
+            return None
 
     def load_component_data(
         self,
@@ -837,6 +906,16 @@ class AnalyticsAgent:
             Dictionary containing query results with charts and analysis
         """
         try:
+            # Check if this is a machine vibration query (UC2)
+            vibration_keywords = ['vibration', 'machine', 'tool', 'breakage', 'milling', 
+                                'frequency', 'endmill', 'diameter', 'teeth', 'cutting']
+            query_lower = query_text.lower()
+            
+            if any(keyword in query_lower for keyword in vibration_keywords):
+                # Enhanced UC2 vibration query handling with specific parameter extraction
+                return self._handle_enhanced_vibration_query(query_text)
+                
+            # Continue with factory data analysis (UC1)
             # Parse time range from query if not provided
             if time_range is None:
                 time_range = self.parse_time_range_from_query(query_text)
