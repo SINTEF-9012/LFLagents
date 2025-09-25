@@ -26,7 +26,7 @@ embedding_model = HuggingFaceEmbeddings(
     model_kwargs={'device': 'cpu'},  # Use 'cuda' if you have GPU
     encode_kwargs={'normalize_embeddings': True}
 )
-print("🌍 Using multilingual embeddings for cross-language retrieval")
+# print("🌍 Using multilingual embeddings for cross-language retrieval")
 
 # Neo4j setup
 graph = Neo4jGraph(
@@ -276,7 +276,7 @@ def load_vector_index(
 
     Args:
         index_name (str): The name of the vector index to retrieve. Defaults to "documents".
-        embedding (OpenAIEmbeddings): The embedding model to use. Defaults to OpenAIEmbeddings with "text-embedding-3-small".
+        embedding (HuggingFaceEmbeddings): The embedding model to use. Defaults to free HuggingFace multilingual embeddings.
 
     Returns:
         Neo4jVector: An instance of the Neo4jVector for the specified index.

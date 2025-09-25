@@ -25,7 +25,9 @@ from langdetect import detect
 load_dotenv()
 CHAT_MODEL = os.getenv("CHAT_MODEL")
 
-llm = ChatOpenAI(model=CHAT_MODEL, temperature=0)
+from utils.llm_config import get_llm_instance
+
+llm = get_llm_instance(model_name=CHAT_MODEL, temperature=0.0)
 
 def detect_language(text: str) -> str:
     """
