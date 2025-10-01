@@ -47,9 +47,13 @@ NEO4J_APOC_IMPORT_FILE_ENABLED=true
 NEO4J_APOC_IMPORT_FILE_USE_NEO4J_CONFIG=true
 NEO4J_PLUGINS=["apoc", "graph-data-science"]
 
-# LLMs Config
-CHAT_MODEL = "gpt-4o"
-EMBEDDING_MODEL = "text-embedding-3-small"
+CHAT_MODEL = "llama3.1:8b"
+TEMPERATURE = 0
+
+MQTT_BROKER_HOST = <your_mqtt_broker_host>
+MQTT_BROKER_PORT = <your_mqtt_broker_port>
+MQTT_BROKER_USERNAME = <your_mqtt_broker_username>
+MQTT_BROKER_PASSWORD = <your_mqtt_broker_password>
 ```
 
 ## Overview

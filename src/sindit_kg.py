@@ -2,6 +2,10 @@ import os
 from utils.sindit_api import query_get_api, load_json, load_mqtt_config, query_post_api, query_post_vault_mqtt_pass
 
 if __name__ == "__main__":
+    # 0. Switch to training_factory workspace
+    query_post_api('ws/switch?workspace_name=training_factory', {})
+    print("Switched to workspace: training_factory")
+    
     # 1. Register connection
     connection = load_mqtt_config(os.path.join(os.path.dirname(__file__), 'config/connections.json'))
     query_post_api('kg/connection', connection)
