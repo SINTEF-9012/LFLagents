@@ -8,7 +8,7 @@ Learning Feedback Loop agent-based approach is a multi-agent framework to assist
 
 - Recommendation Module: (Real-time) manufacturing process reconfiguration suggestions may be made by using AI agents to automatically produce feedback and recommendations based on data analysis and trend indicators.
 
-Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and large language models (LLMs) to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, we have been developing an integrated agent approach, combining the strengths of both the RetrieverAgent and the MonitoringAgent into the Integrated Agent to provide a unified interface for factory information retrieval and real-time monitoring.
+Generative AI and LLMs-based Analysis Module has been developed first with a Retriever Agent, which constructs a Neo4j graph (Knowledge Graph) and a Neo4j Vector Index from unstructured data extracted from manual user PDF files. The Retriever Agent integrates Neo4j graph database tools and large language models to provide a retrieval-augmented generation (RAG) system. It combines structured and unstructured data to answer user queries effectively. Second, we have been working on a Monitoring Agent to provide real-time monitoring and analysis of manufacturing data by interface with the Knowledge Graph API. Third, the Analytics Agent provides semantic insights and interprets charts from historical sensor data by computing relevant metrics and detecting patterns. Finally, we have been developing an integrated agent approach, combining the strengths of the RetrieverAgent, the MonitoringAgent and the AnalyticsAgent into the Integrated Agent to provide a unified interface for factory information retrieval, real-time monitoring and time-series analytics within a single interactive agent framework.
 
 ## Getting Started
 
@@ -19,8 +19,9 @@ git clone https://github.com/SINTEF-9012/LFLagents.git
 ```
 
 ### 2. Install the requirements
-
 ```bash
+cd LFLagents
+
 pip install -r requirements.txt
 ```
 
@@ -47,7 +48,7 @@ NEO4J_APOC_IMPORT_FILE_ENABLED=true
 NEO4J_APOC_IMPORT_FILE_USE_NEO4J_CONFIG=true
 NEO4J_PLUGINS=["apoc", "graph-data-science"]
 
-CHAT_MODEL = "llama3.1:8b"
+CHAT_MODEL = "<your_chat_model>" # e.g. gpt-4o, gpt-4o-mini, llama-3.5, ...
 TEMPERATURE = 0
 
 MQTT_BROKER_HOST = <your_mqtt_broker_host>
@@ -84,9 +85,6 @@ The **multilingual capabilities** enable cross-language retrieval, allowing user
 ## Part 1: Retriever Agent
 
 The RetrieverAgent handles factory documentation retrieval using a sophisticated knowledge graph approach. It combines structured and unstructured data to provide comprehensive answers to user queries.
-
-![RA](images/toy_factory_ra_implementation.png)
-
 
 ### 1. Neo4j DB construction
 
@@ -206,9 +204,6 @@ The `RetrieverAgent` (`src/retriever_agent.py`)integrates Neo4j graph database t
 
 The MonitoringAgent provides real-time monitoring capabilities by interfacing with the SINDIT Knowledge Graph-based Digital Twin framework.
 
-![MA](images/toy_factory_ma_implementation.png)
-
-
 ### 1. Set Up the SINDIT Knowledge Graph-Based DT Framework
 
 SINDIT is structured according to the reference architecture for digital twin (DT) systems developed in the COGNIMAN project. It enhances flexibility and modularity through interfaces that connect different components for building knowledge graph-based DTs. See the [SINDIT documentation](https://github.com/SINTEF-9012/SINDIT20) to set up the framework.
@@ -259,8 +254,6 @@ The `MonitoringAgent` (`src/monitoring_agent.py`) is designed to provide real-ti
 ## Part 3: AnalyticsAgent
 
 The AnalyticsAgent provides comprehensive historical data analysis, visualization, and LLM-powered insights for manufacturing processes.
-
-![AA](images/toy_factory_aa_implementation.png)
 
 - **Advanced Analytics**:
   - Process cycle detection
@@ -314,6 +307,12 @@ streamlit run src/app.py
 
 This command starts the Streamlit application, providing a user-friendly interface for interacting with the agents and visualizing the factory's status.
 
-![streamlit_demo](images/streamlit_170725_p1.png)
+![alt text](images/streamlit_081025_00.png)
 
-![streamlit_demo](images/streamlit_170725_p2.png)
+![alt text](images/streamlit_081025_01.png)
+
+![alt text](images/streamlit_081025_02.png)
+
+![alt text](images/streamlit_081025_03.png)
+
+![alt text](images/streamlit_081025_04.png)
