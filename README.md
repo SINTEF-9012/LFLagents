@@ -161,14 +161,6 @@ from utils.vector_search_examples import search_all_documents
 results = search_all_documents("safety procedures")
 ```
 
-**To construct the Neo4j graph from multiple use cases, run:**
-
-```bash
-python src/transform_manual_file_to_neo4jdb.py
-```
-
-This script processes PDF files in the `manual` folder (organized by UC1, UC2 subdirectories), applies blank page filtering and semantic chunking, extracts graph data with language detection, and stores everything in a unified Neo4j database with multilingual vector index.
-
 ![Graph by LLMs](images/KG_graph_from_text.png)
 <p align="center">
    <em>Information Extraction Pipeline from Text to Knowledge Graph</em>
