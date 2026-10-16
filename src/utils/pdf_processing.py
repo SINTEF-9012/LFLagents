@@ -24,7 +24,7 @@ and chunk the text into smaller segments for further processing.
 
 import os
 import glob
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.schema import Document
@@ -295,24 +295,38 @@ def process_all_pdfs_in_directory_batch(directory_path: str, chunk_size: int = 2
     print(f"Total documents loaded in batch: {len(all_documents)}")
     return all_documents
 
-def get_subdirectories(directory_path: str) -> List[str]:
+def get_subdirectories(directory_path: str, include: Optional[List[str]] = None) -> List[str]:
     """
-    Get all subdirectories from a directory.
-    
+    Get all subdirectories from a directory, optionally filtered by name.
+
     Args:
         directory_path (str): Path to the directory to search for subdirectories.
-        
+        include (List[str], optional): Subdirectory names to keep (case-insensitive).
+            If None, all subdirectories are returned.
+
     Returns:
         List[str]: List of paths to subdirectories found in the directory.
     """
     if not os.path.isdir(directory_path):
         raise ValueError(f"Directory path {directory_path} is not a valid directory.")
-    
+
+    # Normalize the filter names for case-insensitive matching
+    include_lower = [name.lower() for name in include] if include else None
+
     subdirectories = []
     for item in os.listdir(directory_path):
         item_path = os.path.join(directory_path, item)
         if os.path.isdir(item_path):
+            if include_lower is not None and item.lower() not in include_lower:
+                continue
             subdirectories.append(item_path)
+
+    # Fail early if the filter matched nothing (e.g. a typo like "uc3")
+    if include_lower is not None and not subdirectories:
+        available = [d for d in os.listdir(directory_path) if os.path.isdir(os.path.join(directory_path, d))]
+        raise ValueError(
+            f"No subdirectories matching {include} in {directory_path}. Available: {available}"
+        )
     
     # Sort the subdirectories for consistent processing order
     subdirectories.sort()
@@ -323,19 +337,21 @@ def get_subdirectories(directory_path: str) -> List[str]:
     
     return subdirectories
 
-def process_subdirectories_individually(directory_path: str, chunk_size: int = 2048, chunk_overlap: int = 100) -> dict:
+def process_subdirectories_individually(directory_path: str, chunk_size: int = 2048, chunk_overlap: int = 100, include: Optional[List[str]] = None) -> dict:
     """
     Process each subdirectory individually, treating each as a separate document collection.
-    
+
     Args:
         directory_path (str): Path to the directory containing subdirectories with PDF files.
         chunk_size (int): Size of text chunks for splitting.
         chunk_overlap (int): Overlap between chunks.
-        
+        include (List[str], optional): Subdirectory names to process (case-insensitive).
+            If None, all subdirectories are processed.
+
     Returns:
         dict: Dictionary mapping subdirectory names to their processed documents and file mappings.
     """
-    subdirectories = get_subdirectories(directory_path)
+    subdirectories = get_subdirectories(directory_path, include=include)
     
     if not subdirectories:
         print(f"No subdirectories found in directory: {directory_path}")

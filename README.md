@@ -161,6 +161,19 @@ from utils.vector_search_examples import search_all_documents
 results = search_all_documents("safety procedures")
 ```
 
+**To construct the graph for only specific use case(s), run:**
+
+```bash
+# Only uc1 (wipes the database first, then builds the uc1 graph)
+python src/transform_manual_file_to_neo4jdb.py --uc uc1
+
+# Only uc2
+python src/transform_manual_file_to_neo4jdb.py --uc uc2
+
+# Add uc2 to an existing graph without wiping it
+python src/transform_manual_file_to_neo4jdb.py --uc uc2 --no-clean
+```
+
 ![Graph by LLMs](images/KG_graph_from_text.png)
 <p align="center">
    <em>Information Extraction Pipeline from Text to Knowledge Graph</em>

@@ -1,4 +1,5 @@
 import os
+import argparse
 from utils.pdf_processing import (
     load_and_chunk_pdf, 
     process_pdf_directory_individually,
@@ -43,15 +44,19 @@ def process_pdf_directory_individual(directory_path: str):
     print(f"File mapping: {file_mapping}")
     process_documents_to_graph(documents)
 
-def process_subdirectories_with_separate_graphs(directory_path: str):
+def process_subdirectories_with_separate_graphs(directory_path: str, include=None):
     """
     Process subdirectories individually, creating separate graphs for each subdirectory.
-    
+
     Args:
         directory_path (str): Path to the directory containing subdirectories with PDF files.
+        include (list, optional): List of subdirectory names to process (case-insensitive).
+            If None, all subdirectories are processed.
     """
     print(f"Processing subdirectories in: {directory_path}")
-    subdirectory_results = process_subdirectories_individually(directory_path)
+    if include:
+        print(f"Filtering to use cases: {include}")
+    subdirectory_results = process_subdirectories_individually(directory_path, include=include)
     
     if not subdirectory_results:
         print("No subdirectories found or processed.")
@@ -149,17 +154,40 @@ def process_documents_to_graph(documents, graph_name: str = "default"):
     }
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Build the Neo4j graph from manual PDF files."
+    )
+    parser.add_argument(
+        "--uc",
+        nargs="+",
+        default=None,
+        metavar="USE_CASE",
+        help="Only process the given use case(s), e.g. --uc uc1 or --uc uc1 uc2. "
+             "Omit to process all use cases found in the manual directory."
+    )
+    parser.add_argument(
+        "--no-clean",
+        action="store_true",
+        help="Skip cleaning the Neo4j graph database before processing "
+             "(use when adding a use case to an existing graph)."
+    )
+    args = parser.parse_args()
+
     # Configuration - Choose your processing mode
     PROCESSING_MODE = "subdirectories"  # Options: "single", "individual", "subdirectories"
-    
+
     # Path to the PDF file or directory
     PDF_PATH = "./manual"  # Main directory containing subdirectories (uc1, uc2, etc.)
     # PDF_PATH = "./manual/fabrik_2020_S7-1500_EN_korrigiert_final.pdf"  # Single file
     # PDF_PATH = "./manual/uc2"  # Directory with multiple PDFs
 
     # Clean the Neo4j graph database
-    print("Cleaning the Neo4j graph database...")
-    clean_graph()
+    if args.no_clean:
+        print("Skipping Neo4j graph cleanup (--no-clean). Existing graphs are kept.")
+    else:
+        print("Cleaning the Neo4j graph database...")
+        clean_graph()
 
     # Choose processing method
     processed_sources = []
@@ -184,7 +212,7 @@ if __name__ == "__main__":
     elif PROCESSING_MODE == "subdirectories":
         # Process subdirectories individually, creating separate graphs for each
         if os.path.isdir(PDF_PATH):
-            result = process_subdirectories_with_separate_graphs(PDF_PATH)
+            result = process_subdirectories_with_separate_graphs(PDF_PATH, include=args.uc)
             if result:
                 processed_sources = result
         else:
