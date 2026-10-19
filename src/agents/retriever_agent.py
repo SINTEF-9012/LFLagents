@@ -11,12 +11,12 @@ import json
 from datetime import datetime
 
 from utils.neo4j_connection import graph, load_vector_index
-from utils.llm_config import get_llm_instance  # Use flexible LLM config
+from utils.llm_config import get_llm_instance, get_temperature, strip_reasoning  # Use flexible LLM config
 
 from langchain_community.chains.graph_qa.cypher import GraphCypherQAChain
 
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.chains import ConversationChain
+from langchain.chains import ConversationChain, LLMChain
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 
 from langchain.pydantic_v1 import BaseModel
@@ -31,8 +31,9 @@ from langchain.prompts import (
 )
 
 # Load environment variables
-CHAT_MODEL = os.getenv('CHAT_MODEL')
-TEMPERATURE = float(os.getenv('TEMPERATURE', 0.0))
+# CHAT_MODEL is read at LLM-construction time (os.getenv) so callers that
+# switch models via the environment after import are respected.
+TEMPERATURE = get_temperature()
 
 # Load the graph db
 neo4j_graph = graph
@@ -59,6 +60,14 @@ class Neo4jVectorTool(BaseTool):
 
         return all_pages
 
+class CypherGenerationChain(LLMChain):
+    """LLMChain that strips leaked reasoning text from the generated Cypher
+    before the QA chain parses it"""
+
+    def run(self, *args, **kwargs):
+        return strip_reasoning(super().run(*args, **kwargs))[0]
+
+
 class Neo4jCypherTool(BaseTool):
     name: str = "neo4j_cypher_tool"
     description: str = "Tool for retrieving structured, interconnected, and relational knowledge from the Neo4j graph."
@@ -84,7 +93,7 @@ class Neo4jCypherTool(BaseTool):
         # cypher_validation = CypherQueryCorrector(corrector_schema)
 
         # LLM for Cypher query generation
-        CYPHER_LLM = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        CYPHER_LLM = get_llm_instance(model_name=os.getenv('CHAT_MODEL'), temperature=TEMPERATURE)
 
         # Generate Cypher query with source filtering
         source_instruction = ""
@@ -126,8 +135,13 @@ class Neo4jCypherTool(BaseTool):
             top_k=5,
             allow_dangerous_requests=True,
         )
+        # Strip leaked reasoning from the generated Cypher before the QA
+        # chain parses it
+        chain.cypher_generation_chain = CypherGenerationChain(
+            llm=CYPHER_LLM, prompt=CYPHER_GENERATION_PROMPT
+        )
 
-        return chain.run(question)
+        return strip_reasoning(chain.run(question))[0]
 
 class RetrieverAgent:
 
@@ -138,7 +152,7 @@ class RetrieverAgent:
         self.vector_tool = Neo4jVectorTool()
 
         # Initialize chat model with flexible LLM config
-        self.llm = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        self.llm = get_llm_instance(model_name=os.getenv('CHAT_MODEL'), temperature=TEMPERATURE)
         # Initialize session state variables
         self.initialize_session_state()
 
@@ -353,7 +367,8 @@ class RetrieverAgent:
             # Use the conversation chain with the appropriate system context
             response = self.conversation.predict(input=enhanced_input)
 
-            return response
+            # Reasoning models may leak reasoning-tag blocks into the content
+            return strip_reasoning(response)[0]
 
         except Exception as e:
             return f"Error processing documentation query: {str(e)}"

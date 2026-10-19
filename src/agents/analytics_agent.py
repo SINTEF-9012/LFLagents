@@ -936,6 +936,9 @@ class AnalyticsAgent:
                     "available_data_range": "2022-12-01 to 2022-12-31",
                     "query": query_text,
                     "time_range": time_range,
+                    "image_sent": False,
+                    "image_path": None,
+                    "image_fallback_reason": "time_range_outside_data",
                     "success": False,
                 }
 
@@ -973,6 +976,9 @@ class AnalyticsAgent:
                     "time_range": time_range,
                     "primary_component": primary_component,
                     "query_type": query_type,
+                    "image_sent": False,
+                    "image_path": None,
+                    "image_fallback_reason": "no_data_for_time_range",
                     "success": False,
                 }
 
@@ -987,8 +993,12 @@ class AnalyticsAgent:
                 query_type == "process_analysis"
                 and primary_data is not None
                 and not primary_data.empty
+                # T3-text control: suppress the chart entirely
+                and os.getenv("LFL_DISABLE_IMAGE", "") != "1"
             ):
-                chart_path = self._save_chart_for_llm(primary_component, primary_data)
+                chart_path = self._save_chart_for_llm(
+                    primary_component, primary_data, time_range
+                )
 
             # Generate response based on query type
             if query_type == "environmental":
@@ -1000,11 +1010,14 @@ class AnalyticsAgent:
                     "chart_path": chart_path,
                     "query_type": "environmental",
                     "llm_analysis": data_summary,  # For environmental, just return data summary
+                    "image_sent": False,
+                    "image_path": chart_path,
+                    "image_fallback_reason": "environmental_query_no_chart",
                     "success": True,
                 }
             else:  # process_analysis
                 # Generate LLM analysis for process queries
-                llm_analysis = self._generate_llm_analysis(
+                llm_analysis, image_info = self._generate_llm_analysis(
                     chart_path, data_summary, query_text, primary_component
                 )
 
@@ -1016,6 +1029,9 @@ class AnalyticsAgent:
                     "chart_path": chart_path,
                     "query_type": "process_analysis",
                     "llm_analysis": llm_analysis,
+                    "image_sent": image_info["image_sent"],
+                    "image_path": image_info["image_path"],
+                    "image_fallback_reason": image_info["fallback_reason"],
                     "success": True,
                 }
 
@@ -1105,13 +1121,34 @@ class AnalyticsAgent:
 
         return unique_components
 
-    def _save_chart_for_llm(self, component: str, data: pd.DataFrame) -> Optional[str]:
-        """Save chart to file for LLM analysis."""
+    def _save_chart_for_llm(
+        self,
+        component: str,
+        data: pd.DataFrame,
+        time_range: Optional[Tuple[datetime, datetime]] = None,
+    ) -> Optional[str]:
+        """Save chart to file for LLM analysis.
+
+        When LFL_CHART_CACHE_DIR is set, pre-rendered PNGs are
+        reused, keyed by (component, time range), so every model receives
+        byte-identical images and charts are not regenerated on every run.
+        """
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            chart_path = os.path.join(
-                self.charts_dir, f"{component.lower()}_{timestamp}.png"
-            )
+            cache_dir = os.getenv("LFL_CHART_CACHE_DIR")
+            if cache_dir and time_range is not None:
+                os.makedirs(cache_dir, exist_ok=True)
+                start, end = time_range
+                chart_path = os.path.join(
+                    cache_dir,
+                    f"{component.lower()}_{start:%Y%m%d_%H%M%S}_{end:%Y%m%d_%H%M%S}.png",
+                )
+                if os.path.exists(chart_path):
+                    return chart_path
+            else:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                chart_path = os.path.join(
+                    self.charts_dir, f"{component.lower()}_{timestamp}.png"
+                )
 
             fig = self._create_chart_by_component(component, data)
             if fig is not None:
@@ -1127,18 +1164,32 @@ class AnalyticsAgent:
         data_summary: str,
         query_text: str,
         primary_component: str,
-    ) -> str:
-        """Generate LLM analysis for process queries."""
-        if chart_path and os.path.exists(chart_path):
-            return generate_comprehensive_process_explanation(
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Generate LLM analysis for process queries.
+
+        Returns (analysis_text, image_info) where image_info exposes the
+        vision-call outcome: image_sent, image_path and, when no
+        image was sent, the fallback reason. The user-visible text is
+        unchanged.
+        """
+        # T3-text control: with LFL_DISABLE_IMAGE=1 the image is
+        # never sent; the analysis uses the data summary only.
+        image_disabled = os.getenv("LFL_DISABLE_IMAGE", "") == "1"
+        if chart_path and os.path.exists(chart_path) and not image_disabled:
+            analysis = generate_comprehensive_process_explanation(
                 chart_path, data_summary, None  # No custom prompt for standard queries
             )
+            return analysis, {
+                "image_sent": True,
+                "image_path": chart_path,
+                "fallback_reason": None,
+            }
         else:
             # Provide a more helpful response when no chart is available
             component_name = primary_component.lower().replace("_", " ")
 
             if "no data available" in data_summary.lower() or not data_summary.strip():
-                return (
+                text = (
                     f"No {component_name} activity was detected for the requested time period. This could indicate:\n\n"
                     f"• The factory was not operational during this time\n"
                     f"• The {component_name} components were in idle state\n"
@@ -1146,7 +1197,17 @@ class AnalyticsAgent:
                     f"Consider checking a different time range or verifying system status."
                 )
             else:
-                return f"Based on the query '{query_text}', here's the {component_name} analysis:\n\n{data_summary}"
+                text = f"Based on the query '{query_text}', here's the {component_name} analysis:\n\n{data_summary}"
+
+            fallback_reason = (
+                "disabled_by_env" if image_disabled
+                else ("chart_file_missing" if chart_path else "no_chart_generated")
+            )
+            return text, {
+                "image_sent": False,
+                "image_path": chart_path,
+                "fallback_reason": fallback_reason,
+            }
 
     @lru_cache(maxsize=64)
     def parse_time_range_from_query(self, query: str) -> Tuple[datetime, datetime]:
