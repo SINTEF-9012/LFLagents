@@ -8,9 +8,9 @@ capabilities, enabling multimodal analysis of charts and graphs.
 
 import base64
 import os
-from typing import Dict
+from typing import Dict, Optional
 
-from utils.llm_config import get_llm_instance
+from utils.llm_config import get_llm_instance, get_max_tokens, get_temperature, strip_reasoning
 
 
 class LLMImageAnalyzer:
@@ -18,9 +18,11 @@ class LLMImageAnalyzer:
     A class for analyzing manufacturing process images using LLM vision models.
     """
 
-    # Constants
-    DEFAULT_TEMPERATURE = 0.3  # Slightly higher for more creative analysis
-    DEFAULT_MAX_TOKENS = 2000  # Increased for more detailed analysis
+    # Defaults are resolved from the environment in __init__
+    # one temperature (TEMPERATURE) and one output-token cap (LLM_MAX_TOKENS)
+    # shared with every other LLM instance.
+    DEFAULT_TEMPERATURE = None
+    DEFAULT_MAX_TOKENS = None
 
     # Shared factory context and instructions
     FACTORY_PROCESS_CONTEXT = """
@@ -53,8 +55,8 @@ class LLMImageAnalyzer:
     def __init__(
         self,
         model: str = None,
-        temperature: float = DEFAULT_TEMPERATURE,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
+        temperature: Optional[float] = DEFAULT_TEMPERATURE,
+        max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
     ):
         """
         Initialize the LLM image analyzer.
@@ -65,6 +67,10 @@ class LLMImageAnalyzer:
             max_tokens: Maximum tokens in response
         """
         self.model = model
+        if temperature is None:
+            temperature = get_temperature()
+        if max_tokens is None:
+            max_tokens = get_max_tokens()
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.llm = get_llm_instance(
@@ -125,9 +131,11 @@ class LLMImageAnalyzer:
             response: LLM response object
 
         Returns:
-            Response content as string
+            Response content as string, with any leaked reasoning blocks
+            stripped
         """
-        return response.content if hasattr(response, "content") else str(response)
+        content = response.content if hasattr(response, "content") else str(response)
+        return strip_reasoning(content)[0]
 
     def _create_data_enhanced_prompt(self, process_data_summary: str) -> str:
         """
@@ -271,6 +279,10 @@ class LLMImageAnalyzer:
 class ChartImageSaver:
     """
     A class for saving Plotly charts as high-quality images.
+
+    The export scale is configurable via CHART_SCALE: the app
+    keeps the default (3), while the evaluation harness sets CHART_SCALE=1 so
+    charts stay small enough to control vision latency and token cost.
     """
 
     # Constants
@@ -278,15 +290,13 @@ class ChartImageSaver:
     DEFAULT_HEIGHT = 900
     DEFAULT_SCALE = 3
     DEFAULT_FORMAT = "png"
-    DEFAULT_ENGINE = "kaleido"
 
     def __init__(
         self,
         width: int = DEFAULT_WIDTH,
         height: int = DEFAULT_HEIGHT,
-        scale: int = DEFAULT_SCALE,
+        scale: Optional[int] = None,
         format: str = DEFAULT_FORMAT,
-        engine: str = DEFAULT_ENGINE,
     ):
         """
         Initialize the chart image saver.
@@ -294,15 +304,14 @@ class ChartImageSaver:
         Args:
             width: Image width in pixels
             height: Image height in pixels
-            scale: Scale factor for image quality
+            scale: Scale factor for image quality (defaults to CHART_SCALE
+                    from the environment, or 3)
             format: Image format (png, jpg, etc.)
-            engine: Engine to use for image export
         """
         self.width = width
         self.height = height
-        self.scale = scale
+        self.scale = int(os.getenv("CHART_SCALE", str(self.DEFAULT_SCALE))) if scale is None else scale
         self.format = format
-        self.engine = engine
 
     def _ensure_directory_exists(self, filepath: str) -> None:
         """
@@ -351,14 +360,14 @@ class ChartImageSaver:
             # Configure the figure for export (note: modifies the original)
             configured_fig = self._configure_figure_for_export(fig)
 
-            # Export the image
+            # Export the image (plotly 6 + kaleido v1 select the engine
+            # themselves; passing engine= is no longer accepted)
             configured_fig.write_image(
                 filepath,
                 format=self.format,
                 width=self.width,
                 height=self.height,
                 scale=self.scale,
-                engine=self.engine,
             )
 
             # print(f"Successfully saved chart: {filepath}")
@@ -407,8 +416,9 @@ def generate_comprehensive_process_explanation(
     Returns:
         Comprehensive explanation using data + image analysis with optional custom focus
     """
-    # Use enhanced settings for more detailed and intelligent analysis
-    analyzer = LLMImageAnalyzer(temperature=0.1, max_tokens=2000)
+    # Env-driven settings (TEMPERATURE, LLM_MAX_TOKENS) shared with every
+    # other LLM instance
+    analyzer = LLMImageAnalyzer()
 
     # Always use comprehensive data + image analysis
     if custom_prompt and custom_prompt.strip():
