@@ -22,11 +22,12 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel
 
 from utils.sindit_api import query_get_api, query_get_connections_info
-from utils.llm_config import get_llm_instance  # Use flexible LLM config
+from utils.llm_config import get_llm_instance, get_temperature, strip_reasoning
 
 # Load environment variables
-CHAT_MODEL = os.getenv('CHAT_MODEL')
-TEMPERATURE = float(os.getenv('TEMPERATURE', 0.0))
+# CHAT_MODEL is read at LLM-construction time (os.getenv) so callers that
+# switch models via the environment after import are respected.
+TEMPERATURE = get_temperature()
 
 class MonitoringQuery(BaseModel):
     query: str
@@ -205,7 +206,7 @@ class MonitoringAgent:
         # self.status_analyzer = ManufacturingStatusAnalyzer()
 
         # Initialize chat model with flexible LLM config
-        self.llm = get_llm_instance(model_name=CHAT_MODEL, temperature=TEMPERATURE)
+        self.llm = get_llm_instance(model_name=os.getenv('CHAT_MODEL'), temperature=TEMPERATURE)
 
         # Initialize conversation chain
         self.initialize_conversation_chain()
@@ -278,7 +279,7 @@ class MonitoringAgent:
 
         return {
             "realtime_data": realtime_data,
-            "source": "Monitoringgent"
+            "source": "MonitoringAgent"
         }
 
     # def analyze_manufacturing_status(self, query: str, asset_type: str = None, property_type: str = None) -> Dict[str, Any]:
@@ -331,7 +332,8 @@ class MonitoringAgent:
         else:
             response = str(response_result)
 
-        return response
+        # Reasoning models may leak reasoning-tag blocks into the content (spec §6 C4)
+        return strip_reasoning(response)[0]
 
     def get_sindit_status(self) -> Dict[str, Any]:
         """
