@@ -1,44 +1,133 @@
 """
 LLM Configuration Module for Flexible Model Support
 
-Supports both OpenAI and Ollama models with easy switching via environment variables.
+Supports OpenAI, OpenAI-compatible (e.g. IDUN) and Ollama models with easy
+switching via environment variables.
 """
 
 import os
-from typing import Any, Optional
+import re
+from typing import Any, Optional, Tuple
+
+# Tag names reasoning models may leak into `content`
+# The tags are built from these names so the patterns stay in sync.
+_REASONING_TAG_NAMES = ("think", "thinking", "reasoning", "thought")
+_REASONING_BLOCK_RE = re.compile(
+    "<(?:" + "|".join(_REASONING_TAG_NAMES) + ")>"
+    ".*?"
+    "</(?:" + "|".join(_REASONING_TAG_NAMES) + ")>",
+    re.DOTALL,
+)
+_REASONING_OPEN_TAGS = tuple(f"<{name}>" for name in _REASONING_TAG_NAMES)
+
+
+def get_temperature() -> float:
+    """
+    Parse TEMPERATURE once, as a float
+
+    All LLM instances in the system use this value.
+    """
+    try:
+        return float(os.getenv("TEMPERATURE", "0.0"))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def get_max_tokens() -> int:
+    """
+    Single output-token cap for every LLM instance
+
+    Reasoning models can spend a small cap entirely on reasoning and return
+    empty content, so the default is generous.
+    """
+    try:
+        return int(os.getenv("LLM_MAX_TOKENS", "16384"))
+    except (TypeError, ValueError):
+        return 16384
+
+
+def strip_reasoning(text: Optional[str]) -> Tuple[str, bool]:
+    """
+    Remove leaked reasoning blocks (e.g.  trimmed-to-fit reasoning tags)
+    from model output before it is parsed or returned
+
+    Handles closed blocks, unclosed opening tags, and passes clean text
+    through unchanged.
+
+    Returns:
+        (clean_text, leaked): the cleaned string and whether anything was removed.
+    """
+    if not text:
+        return text, False
+    original = text
+    cleaned = _REASONING_BLOCK_RE.sub("", text)
+    # Unclosed opening tag: keep only what precedes it.
+    for tag in _REASONING_OPEN_TAGS:
+        if tag in cleaned:
+            cleaned = cleaned.split(tag, 1)[0]
+    cleaned = cleaned.strip()
+    return cleaned, (cleaned != original)
+
 
 def get_llm_instance(
     model_name: Optional[str] = None,
-    temperature: float = 0.0,
+    temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
     **kwargs
 ) -> Any:
     """
     Get LLM instance based on model configuration.
-    
+
     Supports:
-    - OpenAI models (gpt-4, gpt-3.5-turbo, etc.)
-    - Ollama models (llama3.1:8b, mistral:7b, etc.)
-    
+    - LLM_PROVIDER=openai_compatible: any OpenAI-compatible endpoint
+      (e.g. IDUN) via LLM_BASE_URL + IDUN_API_KEY
+    - OpenAI models (gpt-4, gpt-3.5-turbo, etc.) when LLM_PROVIDER is unset
+    - Ollama models (llama3.1:8b, mistral:7b, etc.) when LLM_PROVIDER is unset
+
     Args:
         model_name: Model name (if None, uses CHAT_MODEL from env)
-        temperature: Generation temperature
-        max_tokens: Maximum tokens to generate
+        temperature: Generation temperature (if None, uses TEMPERATURE from env)
+        max_tokens: Maximum tokens to generate (if None, uses LLM_MAX_TOKENS from env)
         **kwargs: Additional model-specific parameters
-    
+
     Returns:
         LLM instance (ChatOpenAI or ChatOllama)
     """
-    
+
     # Get model from env if not provided
     if model_name is None:
         model_name = os.getenv('CHAT_MODEL', 'gpt-4o-mini')
-    
+
     # Clean model name
     model_name = model_name.strip('"')
-    
+
     print(f"🤖 Initializing LLM: {model_name}")
-    
+
+    # Normalize temperature/max_tokens
+    if temperature is None or isinstance(temperature, str):
+        temperature = get_temperature()
+    if max_tokens is None:
+        max_tokens = get_max_tokens()
+
+    # C1: explicit provider takes precedence. Name guessing is kept
+    # only for backward compatibility when LLM_PROVIDER is unset.
+    provider = os.getenv('LLM_PROVIDER', '').strip('"').lower()
+    if provider == 'openai_compatible':
+        from langchain_openai import ChatOpenAI
+
+        print(f"🔑 Using OpenAI-compatible model: {model_name} "
+              f"at {os.getenv('LLM_BASE_URL', '')}")
+
+        return ChatOpenAI(
+            model=model_name,
+            base_url=os.getenv('LLM_BASE_URL'),
+            api_key=os.getenv('IDUN_API_KEY'),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=float(os.getenv('LLM_TIMEOUT_S', '300')),
+            max_retries=0,  # retries are done and counted by the harness, never hidden here
+        )
+
     # Check if it's an Ollama model (contains ':' or is in known ollama models)
     ollama_indicators = [
         ':',  # llama3.1:8b, mistral:7b
@@ -82,14 +171,9 @@ def get_llm_instance(
             from langchain_openai import ChatOpenAI
             
             print(f"🔑 Using OpenAI model: {model_name}")
-            
-            # Set max_tokens based on model if not provided
-            if max_tokens is None:
-                if 'gpt-4' in model_name:
-                    max_tokens = 4096
-                else:
-                    max_tokens = 2048
-            
+
+            # max_tokens already normalized to LLM_MAX_TOKENS above
+
             llm = ChatOpenAI(
                 model_name=model_name,
                 temperature=temperature,
