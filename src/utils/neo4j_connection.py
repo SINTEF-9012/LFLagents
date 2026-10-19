@@ -8,7 +8,6 @@ import os
 from dotenv import load_dotenv, find_dotenv
 from langchain_community.graphs import Neo4jGraph
 from langchain_community.vectorstores import Neo4jVector
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -20,13 +19,28 @@ CHAT_MODEL = os.getenv("CHAT_MODEL")
 # Load environment variables
 load_dotenv(find_dotenv(), override=True)
 
-# Initialize multilingual embedding model for cross-language retrieval
-embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-    model_kwargs={'device': 'cpu'},  # Use 'cuda' if you have GPU
-    encode_kwargs={'normalize_embeddings': True}
-)
-# print("🌍 Using multilingual embeddings for cross-language retrieval")
+# Embedding model for vector retrieval.
+# EMBEDDING_PROVIDER=idun (default): IDUN-hosted embeddings via the
+# OpenAI-compatible /v1/embeddings endpoint (e.g. Qwen/Qwen3-Embedding-8B).
+# EMBEDDING_PROVIDER=local_hf: the original local HuggingFace model.
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "idun").strip('"').lower()
+
+if EMBEDDING_PROVIDER == "local_hf":
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    embedding_model = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        model_kwargs={'device': 'cpu'},  # Use 'cuda' if you have GPU
+        encode_kwargs={'normalize_embeddings': True}
+    )
+else:
+    from langchain_openai import OpenAIEmbeddings
+    embedding_model = OpenAIEmbeddings(
+        model=os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-8B").strip('"'),
+        openai_api_base=os.getenv("LLM_BASE_URL"),
+        openai_api_key=os.getenv("IDUN_API_KEY"),
+        check_embedding_ctx_length=False,  # non-OpenAI model: skip tiktoken batching
+        chunk_size=16,  # small batches: one /v1/embeddings request per 16 chunks
+    )
 
 # Neo4j setup
 graph = Neo4jGraph(
@@ -46,15 +60,25 @@ def clean_graph():
 def create_vector_index(index_name="documents"):
     """
     Create a unified vector index for Document nodes.
-    
+
+    The index dimension is probed from the configured embedding model so the
+    index always matches the vectors that will be written into it.
+
     Args:
         index_name (str): Name of the vector index. Defaults to "documents".
     """
+    dim = len(embedding_model.embed_query("vector index dimension probe"))
     query = f"""
     CREATE VECTOR INDEX {index_name} IF NOT EXISTS FOR (n:Document) ON (n.embedding)
+    OPTIONS {{
+      indexConfig: {{
+        `vector.dimensions`: {dim},
+        `vector.similarity_function`: 'cosine'
+      }}
+    }}
     """
     graph.query(query)
-    print(f"Vector index '{index_name}' created (if it did not already exist) for Document nodes.")
+    print(f"Vector index '{index_name}' created (dim {dim}, cosine similarity) for Document nodes.")
 
 def update_vector_index(index_name="documents", source_filter=None):
     """
